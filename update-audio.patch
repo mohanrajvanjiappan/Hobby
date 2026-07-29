@@ -1,0 +1,62 @@
+--- src/lib/audio.ts
++++ src/lib/audio.ts
+@@ -178,6 +178,57 @@
+     }
+   }
+ 
++  startCombatMusic() {
++    this.stopBackgroundMusic();
++    try {
++      const ctx = this.getCtx();
++      let step = 0;
++      // More intense, driving sequence for combat mode (D minor)
++      const sequence = [
++        146.83, 146.83, 174.61, 146.83, // D3, D3, F3, D3
++        196.00, 174.61, 146.83, 130.81, // G3, F3, D3, C3
++        146.83, 146.83, 220.00, 196.00, // D3, D3, A3, G3
++        174.61, 146.83, 130.81, 146.83  // F3, D3, C3, D3
++      ];
++      
++      this.bgmInterval = setInterval(() => {
++        if (ctx.state === 'suspended') return;
++        const osc = ctx.createOscillator();
++        const gain = ctx.createGain();
++        const filter = ctx.createBiquadFilter();
++        
++        osc.type = 'square'; // harsher tone
++        osc.frequency.setValueAtTime(sequence[step % sequence.length], ctx.currentTime);
++        
++        filter.type = 'lowpass';
++        filter.frequency.setValueAtTime(3000, ctx.currentTime);
++        filter.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.12);
++        
++        gain.gain.setValueAtTime(0, ctx.currentTime);
++        gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.01);
++        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
++        
++        osc.connect(filter);
++        filter.connect(gain);
++        gain.connect(ctx.destination);
++        
++        osc.start(ctx.currentTime);
++        osc.stop(ctx.currentTime + 0.12);
++        
++        this.bgmOscillators.push(osc);
++        this.bgmGains.push(gain);
++        
++        // Cleanup old nodes
++        if (this.bgmOscillators.length > 20) {
++          this.bgmOscillators.shift();
++          this.bgmGains.shift();
++        }
++        
++        step++;
++      }, 130); // Faster 130ms step
++    } catch (e) {
++      console.warn("Audio bgm start failed", e);
++    }
++  }
++
+   stopBackgroundMusic() {
+     if (this.bgmInterval) {
+       clearInterval(this.bgmInterval);
