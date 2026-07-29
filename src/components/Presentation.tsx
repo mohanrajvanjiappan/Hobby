@@ -1,9 +1,9 @@
 import confetti from 'canvas-confetti';
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Quiz } from '../types';
 import { audioSynth } from '../lib/audio';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause } from 'lucide-react';
+import { Trophy, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson } from 'lucide-react';
 import quizLogo from '../assets/images/quiz_logo_1783447286811.jpg';
 import MapQuestion from './MapQuestion';
 
@@ -65,6 +65,167 @@ const feelingEmojis: Record<string, string> = {
   'Super Smart': '🧠'
 };
 
+interface ParticipantVideoFramesProps {
+  quiz: Quiz;
+  playersState: any[];
+  currentPlayerIndex: number;
+}
+
+const ParticipantVideoFrames: React.FC<ParticipantVideoFramesProps> = ({
+  quiz,
+  playersState,
+  currentPlayerIndex,
+}) => {
+  const [activeCameras, setActiveCameras] = useState<{ [id: string]: boolean }>({});
+  const [streams, setStreams] = useState<{ [id: string]: MediaStream }>({});
+  const videoRefs = useRef<{ [id: string]: HTMLVideoElement | null }>({});
+
+  const players = useMemo(() => {
+    if (playersState && playersState.length > 0) {
+      return playersState.slice(0, 3);
+    }
+    return [
+      {
+        id: 'p1',
+        name: quiz.teamName || 'Player 1',
+        photo: quiz.playerPhoto || '',
+        score: 0,
+      },
+    ];
+  }, [playersState, quiz.teamName, quiz.playerPhoto]);
+
+  const toggleCamera = async (id: string) => {
+    if (activeCameras[id]) {
+      if (streams[id]) {
+        streams[id].getTracks().forEach((track) => track.stop());
+      }
+      setStreams((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setActiveCameras((prev) => ({ ...prev, [id]: false }));
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        setStreams((prev) => ({ ...prev, [id]: stream }));
+        setActiveCameras((prev) => ({ ...prev, [id]: true }));
+      } catch (err) {
+        console.warn('Unable to access camera', err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    Object.keys(streams).forEach((id) => {
+      if (videoRefs.current[id] && streams[id]) {
+        videoRefs.current[id]!.srcObject = streams[id];
+      }
+    });
+  }, [streams]);
+
+  useEffect(() => {
+    return () => {
+      (Object.values(streams) as MediaStream[]).forEach((stream) => {
+        stream?.getTracks().forEach((track) => track.stop());
+      });
+    };
+  }, []);
+
+  if (quiz.showFrames === false) {
+    return null;
+  }
+
+  const size = quiz.frameSize || 'medium';
+
+  // Current large size mapped to small; medium = 1.25x; large = 1.5x
+  const sizeClasses = {
+    small: 'w-52 sm:w-56 md:w-64 h-28 sm:h-32 md:h-40',
+    medium: 'w-64 sm:w-72 md:w-80 h-36 sm:h-40 md:h-50',
+    large: 'w-80 sm:w-84 md:w-96 h-44 sm:h-48 md:h-60',
+  }[size];
+
+  return (
+    <div className="absolute right-3 md:right-6 top-6 bottom-6 flex flex-col justify-start items-end gap-3 md:gap-4 z-40 pointer-events-auto">
+      {players.map((player, idx) => {
+        const isCurrent = idx === currentPlayerIndex;
+        const pId = player.id || `p-${idx}`;
+        const isCamActive = !!activeCameras[pId];
+
+        return (
+          <motion.div
+            key={pId}
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: idx * 0.15 }}
+            className="flex flex-col items-end gap-1.5"
+          >
+            {/* Outside Border Info Bar (Player Name, Turn, Score, Camera) */}
+            <div className="flex items-center justify-between gap-2 px-2.5 py-1 bg-slate-900/95 backdrop-blur-md rounded-xl border border-white/20 text-white shadow-lg w-full">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="font-extrabold text-white text-xs md:text-sm truncate max-w-[100px]">
+                  {player.name || `Player ${idx + 1}`}
+                </span>
+                {isCurrent && (
+                  <span className="px-1.5 py-0.5 text-[9px] md:text-[10px] font-black bg-emerald-500 text-white rounded-md uppercase tracking-wider animate-pulse shadow">
+                    Turn
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => toggleCamera(pId)}
+                  title={isCamActive ? 'Turn Off Camera' : 'Turn On Camera'}
+                  className={`p-1 rounded-full text-xs transition-colors backdrop-blur-md ${
+                    isCamActive
+                      ? 'bg-rose-600 text-white hover:bg-rose-700'
+                      : 'bg-white/20 text-white/90 hover:text-white hover:bg-white/30'
+                  }`}
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                </button>
+                <div className="bg-amber-400 text-amber-950 font-black text-xs px-2 py-0.5 rounded-full shadow-md">
+                  {player.score || 0} pts
+                </div>
+              </div>
+            </div>
+
+            {/* Video / Camera Rectangle with Minimal Elegant Border and Clean White Space */}
+            <div
+              className={`relative rounded-2xl overflow-hidden transition-all duration-300 bg-white ${sizeClasses} ${
+                isCurrent
+                  ? 'border-4 border-emerald-400 ring-4 ring-emerald-400/40 shadow-[0_0_30px_rgba(52,211,153,0.5)] scale-[1.01]'
+                  : 'border-2 border-slate-200/90 shadow-lg ring-1 ring-black/5 hover:border-slate-300'
+              }`}
+            >
+              {isCamActive ? (
+                <video
+                  ref={(el) => (videoRefs.current[pId] = el)}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
+              ) : player.photo ? (
+                <img
+                  src={player.photo}
+                  alt={player.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                /* Cleaner white space for video, no letters or text inside */
+                <div className="w-full h-full bg-white" />
+              )}
+            </div>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+};
+
 export default function Presentation({ quiz, onExit }: PresentationProps) {
   const [stage, setStage] = useState<Stage>('intro');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -81,6 +242,72 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   const [interactiveOptionClicked, setInteractiveOptionClicked] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const categories = useMemo(() => Array.from(new Set(quiz.questions.map(q => q.category).filter(Boolean))) as string[], [quiz.questions]);
+  const isMultipleFiles = useMemo(() => Boolean(
+    quiz.isMultipleFilesLoaded ||
+    categories.length > 1 ||
+    quiz.topic === "Multiple JSON Files" ||
+    (quiz.title && quiz.title.includes("Files Loaded"))
+  ), [quiz.isMultipleFilesLoaded, categories.length, quiz.topic, quiz.title]);
+
+  const getActiveContextTopic = useCallback((qIndex?: number) => {
+    const idx = qIndex !== undefined ? qIndex : currentQuestionIndex;
+    const currentQCategory = quiz.questions[idx]?.category;
+    if (selectedCategory && selectedCategory.trim()) return selectedCategory.trim();
+    if (currentQCategory && currentQCategory.trim()) return currentQCategory.trim();
+    if (quiz.topic && quiz.topic !== "Multiple JSON Files" && quiz.topic.trim()) return quiz.topic.trim();
+    if (quiz.title && !quiz.title.includes("Files Loaded") && quiz.title.trim()) return quiz.title.trim();
+    return "Quiz Challenge";
+  }, [currentQuestionIndex, quiz.questions, selectedCategory, quiz.topic, quiz.title]);
+
+  const getDynamicMilestoneBadge = useCallback((numAnswered: number) => {
+    const totalQ = quiz.questions.length || 1;
+    const maxBadges = Math.min(4, Math.max(1, Math.ceil(totalQ / 5)));
+    const badgeInterval = Math.max(5, Math.ceil(totalQ / maxBadges));
+    const badgeIndex = Math.min(maxBadges - 1, Math.max(0, Math.floor(numAnswered / badgeInterval) - 1));
+    const safeBadgeIndex = Math.min(Math.max(0, badgeIndex), 4);
+
+    const contextTopic = getActiveContextTopic(Math.max(0, numAnswered - 1));
+    const activePlayer = playersState[currentPlayerIndex]?.name || quiz.teamName || 'Player';
+
+    const tierMeta = [
+      { prefix: "Bronze", icon: "🥉", color: "border-amber-700", text: "text-amber-800" },
+      { prefix: "Silver", icon: "🥈", color: "border-slate-300", text: "text-slate-500" },
+      { prefix: "Gold", icon: "🥇", color: "border-yellow-400", text: "text-yellow-600" },
+      { prefix: "Diamond", icon: "💎", color: "border-cyan-300", text: "text-cyan-500" },
+      { prefix: "Legendary", icon: "👑", color: "border-fuchsia-400", text: "text-fuchsia-600" }
+    ];
+
+    const meta = tierMeta[safeBadgeIndex];
+
+    const titleOptions = [
+      `${meta.prefix} ${contextTopic} Explorer`,
+      `${meta.prefix} ${contextTopic} Whiz`,
+      `${meta.prefix} ${contextTopic} Mastermind`,
+      `${meta.prefix} ${contextTopic} Champion`,
+      `${meta.prefix} ${contextTopic} Legend`
+    ];
+
+    const descOptions = [
+      `${activePlayer} mastered ${numAnswered} questions in ${contextTopic}!`,
+      `${activePlayer} showed brilliant knowledge in ${contextTopic}!`,
+      `Incredible streak by ${activePlayer} in ${contextTopic}!`,
+      `Solid performance by ${activePlayer} tackling ${contextTopic}!`,
+      `${activePlayer} is dominating the ${contextTopic} section!`
+    ];
+
+    const variantSeed = (numAnswered * 7 + (currentPlayerIndex || 0) * 3 + contextTopic.length) % titleOptions.length;
+
+    return {
+      title: titleOptions[variantSeed],
+      icon: meta.icon,
+      description: descOptions[variantSeed],
+      color: meta.color,
+      text: meta.text,
+      player: activePlayer,
+      contextTopic,
+      numAnswered
+    };
+  }, [quiz.questions.length, getActiveContextTopic, playersState, currentPlayerIndex, quiz.teamName]);
   const [warmupFeeling, setWarmupFeeling] = useState<string | null>(null);
   const [warmupOptions] = useState<string[]>(() => {
     const feelings = ['Curious', 'Scared', 'Excited', 'Happy', 'Bored', 'Nervous', 'Silly', 'Sleepy', 'Confused', 'Energetic', 'Proud', 'Calm', 'Hungry', 'Ready to Win', 'Super Smart'];
@@ -94,6 +321,39 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   useEffect(() => {
     isPausedRef.current = isPaused;
   }, [isPaused]);
+
+  const handleExportResults = () => {
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      quiz: {
+        title: quiz.title || quiz.topic,
+        topic: quiz.topic,
+        type: quiz.type,
+        mode: quiz.mode || 'video',
+        isMultiplayer: quiz.isMultiplayer,
+        totalQuestions: quiz.questions?.length || 0,
+      },
+      participants: playersState.map(p => ({
+        id: p.id,
+        name: p.name,
+        score: p.score ?? 0,
+        topic: p.topic || '',
+        details: p.details || ''
+      })),
+      singlePlayerScore: quiz.isMultiplayer ? undefined : score,
+      earnedBadges: earnedBadges,
+      questions: quiz.questions
+    };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    const sanitizedTitle = (quiz.title || quiz.topic || 'quiz').toLowerCase().replace(/[^a-z0-9]/g, '_');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `quiz-results-${sanitizedTitle}-${Date.now()}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
 
   const mouseTimerRef = useRef<NodeJS.Timeout | null>(null);
   let clueIndexRef = clueIndex;
@@ -193,9 +453,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         // wait for music to finish (approx 1.5s)
         const t2 = setTimeout(() => {
           // 3. Speak welcome note
+          const playerNames = playersState.map(p => p.name).join(' and ') || 'the players';
+
           let introSpeech = `Welcome back to Quiz Time Brain Boosters. Today we are exploring ${quiz.title || quiz.topic}.`;
-          if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
-            const playerNames = playersState.map(p => p.name).join(' and ');
+          if (quiz.mode === 'interactive' && isMultipleFiles) {
+            introSpeech = `Welcome back to Quiz Time Brain Boosters. It's Challenge between ${playerNames}.`;
+          } else if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
             introSpeech = `Welcome back to Quiz Time Brain Boosters. Today's battle is between ${playerNames}. The topic is ${quiz.title || quiz.topic}.`;
           } else if (quiz.teamName && quiz.mode === 'interactive') {
             introSpeech = `Welcome back to Quiz Time Brain Boosters, ${quiz.teamName}. Today we are exploring ${quiz.title || quiz.topic}.`;
@@ -487,7 +750,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         t = setTimeout(() => {
           audioSynth.playSwoosh();
           // Go to next question, or quote if it's the end
-          const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode';
+          const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
           let numAnswered = 0;
           let willComplete = false;
           
@@ -517,7 +780,11 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               setStage('outro');
             }
           } else {
-            if (numAnswered % 5 === 0) {
+            const totalQ = quiz.questions.length || 1;
+            const maxBadges = Math.min(4, Math.max(1, Math.ceil(totalQ / 5)));
+            const badgeInterval = Math.max(5, Math.ceil(totalQ / maxBadges));
+
+            if (quiz.showBadges !== false && numAnswered > 0 && numAnswered % badgeInterval === 0 && numAnswered < totalQ) {
               setStage('video-badges');
             } else {
               if (isInteractiveGrid) {
@@ -631,48 +898,15 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         ? answeredQuestions.size 
         : currentQuestionIndex + 1;
         
-      const badgeIndex = Math.floor(numAnswered / 5) - 1;
-      const milestoneTiers = [
-        [
-          { title: "Bronze Scholar", icon: "🥉", description: "Great start, keep it up!", color: "border-amber-700", text: "text-amber-800" },
-          { title: "Bronze Explorer", icon: "🥉", description: "Making good progress!", color: "border-amber-700", text: "text-amber-800" },
-          { title: "Bronze Rookie", icon: "🥉", description: "A solid beginning!", color: "border-amber-700", text: "text-amber-800" }
-        ],
-        [
-          { title: "Silver Thinker", icon: "🥈", description: "You're on a roll!", color: "border-slate-300", text: "text-slate-500" },
-          { title: "Silver Brainiac", icon: "🥈", description: "Impressive streak!", color: "border-slate-300", text: "text-slate-500" },
-          { title: "Silver Achiever", icon: "🥈", description: "Moving up the ranks!", color: "border-slate-300", text: "text-slate-500" }
-        ],
-        [
-          { title: "Gold Mastermind", icon: "🥇", description: "Halfway to genius!", color: "border-yellow-400", text: "text-yellow-600" },
-          { title: "Gold Champion", icon: "🥇", description: "Shining bright!", color: "border-yellow-400", text: "text-yellow-600" },
-          { title: "Gold Virtuoso", icon: "🥇", description: "Exceptional skills!", color: "border-yellow-400", text: "text-yellow-600" }
-        ],
-        [
-          { title: "Diamond Genius", icon: "💎", description: "Incredible knowledge!", color: "border-cyan-300", text: "text-cyan-500" },
-          { title: "Diamond Elite", icon: "💎", description: "Top tier performance!", color: "border-cyan-300", text: "text-cyan-500" },
-          { title: "Diamond Star", icon: "💎", description: "Flawless execution!", color: "border-cyan-300", text: "text-cyan-500" }
-        ],
-        [
-          { title: "Legendary Expert", icon: "👑", description: "Unstoppable force!", color: "border-fuchsia-400", text: "text-fuchsia-600" },
-          { title: "Legendary Titan", icon: "👑", description: "Absolute mastery!", color: "border-fuchsia-400", text: "text-fuchsia-600" },
-          { title: "Mythic Hero", icon: "👑", description: "Beyond comparison!", color: "border-fuchsia-400", text: "text-fuchsia-600" }
-        ]
-      ];
-      
-      const safeBadgeIndex = Math.min(Math.max(0, badgeIndex), milestoneTiers.length - 1);
-      // Use a stable seed based on badge index and quiz length
-      const seed = safeBadgeIndex + (quiz.questions.length * 3);
-      const tierOptions = milestoneTiers[safeBadgeIndex];
-      const currentBadge = tierOptions[seed % tierOptions.length];
+      const currentBadge = getDynamicMilestoneBadge(numAnswered);
       
       const speechMsg = quiz.mode === 'interactive' 
-        ? `Milestone reached! You've unlocked the ${currentBadge.title} badge for reaching ${numAnswered} questions!` 
-        : `Wow, you've reached ${numAnswered} questions! Here is a badge for your great effort! Keep it up!`;
+        ? `Milestone reached! ${currentBadge.player} unlocked the ${currentBadge.title} badge for reaching ${numAnswered} questions in ${currentBadge.contextTopic}!` 
+        : `Wow, ${currentBadge.player} reached ${numAnswered} questions! Here is the ${currentBadge.title} badge for your great effort! Keep it up!`;
 
       audioSynth.speak(speechMsg, () => {
         setTimeout(() => {
-           if (quiz.mode === 'interactive' && quiz.type !== 'combat-mode') {
+           if (quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1)) {
              if (categories.length > 1) {
                const categoryQuestions = quiz.questions.map((q, i) => ({q, i})).filter(x => x.q.category === selectedCategory);
                if (categoryQuestions.length > 0 && categoryQuestions.every(x => answeredQuestions.has(x.i) || x.i === currentQuestionIndex)) {
@@ -703,42 +937,32 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       audioSynth.speak('Here are the badges you earned!');
       const generatedBadges = [];
       
-
-      const topicWord = quiz.topic.split(' ')[0] || 'Quiz';
+      const activeContextTopic = getActiveContextTopic();
       const scorePerQuestion = quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1;
       
       const usedBadges = new Set();
       
-      const getRandomBadge = (tier, playerName) => {
+      const getRandomBadge = (tier: string, playerName: string) => {
         const perfectOptions = [
-          { name: 'Perfect Score', icon: '🏆', description: 'Answered everything correctly!' },
-          { name: 'Flawless Victory', icon: '🌟', description: 'Didn\'t miss a single one!' },
-          { name: 'Absolute Genius', icon: '🤯', description: 'Mind-blowing performance!' },
-          { name: 'Trivia Titan', icon: '⚡', description: 'Unstoppable knowledge!' },
-          { name: 'Quiz Conqueror', icon: '👑', description: 'Ruled the game flawlessly!' },
-          { name: 'Mastermind', icon: '🔮', description: 'Saw every correct answer!' },
-          { name: 'Legendary Status', icon: '🦄', description: 'A mythical perfect run!' },
-          { name: 'Brain Boss', icon: '🎯', description: 'Hit the bullseye every time!' }
+          { name: `Perfect ${activeContextTopic} Master`, icon: '🏆', description: `Answered every question correctly in ${activeContextTopic}!` },
+          { name: 'Flawless Victory', icon: '🌟', description: `Didn't miss a single question in ${activeContextTopic}!` },
+          { name: `${activeContextTopic} Titan`, icon: '⚡', description: `Unstoppable expertise in ${activeContextTopic}!` },
+          { name: `${activeContextTopic} Conqueror`, icon: '👑', description: `Ruled the ${activeContextTopic} section flawlessly!` },
+          { name: 'Absolute Genius', icon: '🤯', description: 'Mind-blowing overall performance!' }
         ];
         const whizOptions = [
-          { name: `${topicWord} Whiz`, icon: '🧠', description: `Showed great knowledge of ${quiz.topic}!` },
-          { name: 'Smart Cookie', icon: '🍪', description: 'Very impressive answers!' },
-          { name: 'Rising Star', icon: '✨', description: 'Shining bright with right answers!' },
-          { name: 'Knowledge Ninja', icon: '🥷', description: 'Swift and smart!' },
-          { name: 'Sharp Shooter', icon: '🏹', description: 'Nailed most of the questions!' },
-          { name: 'Quiz Wizard', icon: '🧙', description: 'Magical answering skills!' },
-          { name: 'Brainiac', icon: '💡', description: 'Full of bright ideas!' },
-          { name: 'Clever Fox', icon: '🦊', description: 'Outsmarted the tricky questions!' }
+          { name: `${activeContextTopic} Whiz`, icon: '🧠', description: `Showed great knowledge of ${activeContextTopic}!` },
+          { name: `${activeContextTopic} Specialist`, icon: '⭐', description: `Mastered tricky questions in ${activeContextTopic}!` },
+          { name: `${activeContextTopic} Brainiac`, icon: '💡', description: `Bright and accurate in ${activeContextTopic}!` },
+          { name: `${activeContextTopic} Ninja`, icon: '🥷', description: `Swiftly solved ${activeContextTopic} questions!` },
+          { name: `${activeContextTopic} Wizard`, icon: '🧙', description: `Magical answering skills in ${activeContextTopic}!` },
+          { name: `${activeContextTopic} Ace`, icon: '🎯', description: `Hit the target consistently in ${activeContextTopic}!` }
         ];
         const learnerOptions = [
-          { name: 'Fast Learner', icon: '🌱', description: 'Gained new knowledge today!' },
-          { name: 'Brave Explorer', icon: '🗺️', description: 'Explored new topics!' },
-          { name: 'Great Effort', icon: '👏', description: 'Never gave up!' },
-          { name: 'Curious Cat', icon: '🐱', description: 'Always eager to learn!' },
-          { name: 'Future Expert', icon: '🚀', description: 'On the way to greatness!' },
-          { name: 'Persistent Pupil', icon: '🐢', description: 'Slow and steady wins the race!' },
-          { name: 'Knowledge Seeker', icon: '🔍', description: 'Discovered cool new facts!' },
-          { name: 'Bright Spark', icon: '⚡', description: 'Showing great potential!' }
+          { name: `${activeContextTopic} Explorer`, icon: '🗺️', description: `Explored key facts in ${activeContextTopic}!` },
+          { name: `${activeContextTopic} Seeker`, icon: '🔍', description: `Discovered cool facts in ${activeContextTopic}!` },
+          { name: 'Fast Learner', icon: '🌱', description: `Gained valuable new insights today!` },
+          { name: 'Persistent Player', icon: '🐢', description: `Showed determination through every round!` }
         ];
         
         let pool = learnerOptions;
@@ -849,10 +1073,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       
       {quiz.mode === 'interactive' && showPauseButton && (
         <button
+          type="button"
           onClick={() => setIsPaused(!isPaused)}
-          className="absolute top-6 right-6 z-[60] bg-white/20 backdrop-blur-md p-4 rounded-full shadow-lg border border-white/30 text-white hover:bg-white/30 transition-all"
+          className="fixed bottom-3 right-3 z-[60] bg-black/40 hover:bg-black/70 backdrop-blur-md p-1.5 rounded-full border border-white/20 text-white opacity-0 hover:opacity-100 transition-all duration-300 shadow-md"
+          title={isPaused ? "Resume" : "Pause"}
         >
-          {isPaused ? <Play className="w-8 h-8 fill-current" /> : <Pause className="w-8 h-8 fill-current" />}
+          {isPaused ? <Play className="w-3.5 h-3.5 fill-current" /> : <Pause className="w-3.5 h-3.5 fill-current" />}
         </button>
       )}
 
@@ -861,6 +1087,17 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           <div className="text-white text-6xl font-black uppercase tracking-widest drop-shadow-2xl flex items-center gap-4">
             <Pause className="w-16 h-16 fill-current" /> Paused
           </div>
+        </div>
+      )}
+
+      {/* Watermark Logo bottom right corner for Video mode quiz windows */}
+      {quiz.mode !== 'interactive' && (
+        <div className="fixed bottom-4 right-4 z-50 pointer-events-none flex items-center justify-center p-1 bg-black/30 backdrop-blur-md rounded-full border border-white/20 shadow-xl opacity-80">
+          <img
+            src={quizLogo}
+            alt="Watermark Logo"
+            className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover shadow border border-white/90"
+          />
         </div>
       )}
 
@@ -882,18 +1119,22 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               <img src={(quiz.mode === 'interactive' && quiz.playerPhoto) ? quiz.playerPhoto : quizLogo} alt="Quiz Time Brain Boosters" className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-700" />
             </motion.div>
             <h1 className="text-5xl md:text-7xl font-black mb-8 tracking-tight drop-shadow-2xl text-white">
-              {quiz.isMultiplayer && (quiz.players?.length || 1) > 1
-                ? `Battle: ${playersState.map(p => p.name).join(' vs ')}`
-                : (quiz.mode === 'interactive' 
-                  ? `Welcome ${quiz.teamName}!` 
-                  : (quiz.type === 'combat-mode' ? 'Welcome back to Combat Mode!' : 'Welcome back to Quiz Time Brain Boosters'))}
+              {quiz.mode === 'interactive' && isMultipleFiles
+                ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
+                : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+                  ? `Battle: ${playersState.map(p => p.name).join(' vs ')}`
+                  : (quiz.mode === 'interactive' 
+                    ? `Welcome ${quiz.teamName}!` 
+                    : (quiz.type === 'combat-mode' ? 'Welcome back to Combat Mode!' : 'Welcome back to Quiz Time Brain Boosters')))}
             </h1>
             <p className="text-3xl md:text-4xl opacity-100 font-bold text-cyan-100 drop-shadow-lg max-w-3xl leading-snug">
-              {quiz.isMultiplayer && (quiz.players?.length || 1) > 1
-                ? `Today's topic: ${quiz.title || quiz.topic}`
-                : (quiz.mode === 'interactive' && quiz.playerDetails 
-                  ? quiz.playerDetails 
-                  : (quiz.type === 'combat-mode' ? `Today we are exploring: ${quiz.title || quiz.topic}. Pair up with a friend! Look at your side of the screen and answer before the time runs out!` : `Today we are exploring: ${quiz.title || quiz.topic}`))}
+              {quiz.mode === 'interactive' && isMultipleFiles
+                ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
+                : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+                  ? `Today's topic: ${quiz.title || quiz.topic}`
+                  : (quiz.mode === 'interactive' && quiz.playerDetails 
+                    ? quiz.playerDetails 
+                    : (quiz.type === 'combat-mode' ? `Today we are exploring: ${quiz.title || quiz.topic}. Pair up with a friend! Look at your side of the screen and answer before the time runs out!` : `Today we are exploring: ${quiz.title || quiz.topic}`)))}
             </p>
           </motion.div>
         )}
@@ -930,7 +1171,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 <motion.div
                   key="feeling-emoji"
                   initial={{ scale: 0, rotate: -180, opacity: 0 }}
-                  animate={{ scale: [0, 1.2, 1], rotate: 0, opacity: 1 }}
+                  animate={{ scale: 1, rotate: 0, opacity: 1 }}
                   transition={{ type: "spring", stiffness: 260, damping: 20 }}
                   className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-[100]"
                 >
@@ -952,10 +1193,15 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   animate={{ opacity: 1, y: 0 }}
                   onClick={() => {
                     audioSynth.playSwoosh();
-                    if (categories.length > 1) {
-                      setStage('category-selection');
+                    if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
+                      if (categories.length > 1) {
+                        setStage('category-selection');
+                      } else {
+                        setStage('question-selection');
+                      }
                     } else {
-                      setStage('question-selection');
+                      setCurrentQuestionIndex(0);
+                      setStage('question');
                     }
                   }}
                   className="px-12 py-6 rounded-full bg-white text-indigo-900 font-black text-3xl shadow-[0_0_50px_rgba(255,255,255,0.4)] hover:scale-105 transition-transform flex items-center gap-4 mt-8"
@@ -978,7 +1224,9 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             className="text-center p-8 max-w-7xl flex flex-col items-center justify-center h-full z-10 w-full mx-auto"
           >
             <h2 className="text-5xl md:text-7xl font-black mb-12 tracking-tight drop-shadow-2xl text-white">
-              The Challengers
+              {quiz.mode === 'interactive' && isMultipleFiles
+                ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
+                : "The Challengers"}
             </h2>
             <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 w-full">
               {playersState.map((player, idx) => (
@@ -1007,7 +1255,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       </div>
                     )}
                     <h3 className="text-4xl md:text-5xl font-bold text-white drop-shadow-md mb-2">{player.name}</h3>
-                    {player.topic && <p className="text-xl text-indigo-200 font-semibold mb-2">Topic: {player.topic}</p>}
+                    {(!isMultipleFiles || quiz.mode !== 'interactive') && player.topic && <p className="text-xl text-indigo-200 font-semibold mb-2">Topic: {player.topic}</p>}
                     {player.details && <p className="text-lg text-white/80 italic text-center leading-tight">"{player.details}"</p>}
                   </motion.div>
                 </React.Fragment>
@@ -1082,17 +1330,6 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             >
               End Quiz
             </button>
-            {categories.length > 1 && (
-              <button
-                onClick={() => {
-                  audioSynth.playSwoosh();
-                  setStage('category-selection');
-                }}
-                className="mt-4 px-8 py-4 bg-indigo-500/80 text-white font-bold text-xl rounded-full shadow-lg hover:bg-indigo-600 transition-colors backdrop-blur-sm border border-white/20"
-              >
-                Change Category
-              </button>
-            )}
           </motion.div>
         )}
         
@@ -1102,8 +1339,15 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="text-center p-8 flex flex-col items-center justify-start h-full z-10 w-full mx-auto"
+            className="text-center p-8 flex flex-col items-center justify-start h-full z-10 w-full mx-auto relative"
           >
+            {quiz.mode === 'interactive' && (
+              <ParticipantVideoFrames
+                quiz={quiz}
+                playersState={playersState}
+                currentPlayerIndex={currentPlayerIndex}
+              />
+            )}
             {/* Scoreboard */}
             <div className="flex justify-center gap-8 md:gap-16 w-full mb-12">
               {playersState.map((player, idx) => (
@@ -1128,8 +1372,17 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 {quiz.isMultiplayer ? `${playersState[currentPlayerIndex]?.name}, select a question!` : 'Select a question!'}
               </h2>
               {categories.length > 1 && selectedCategory && (
-                <div className="mt-4 px-6 py-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white font-bold text-2xl flex items-center gap-3">
+                <div className="mt-4 px-6 py-2 bg-white/20 backdrop-blur-md rounded-full border border-white/30 text-white font-bold text-2xl flex items-center gap-3 shadow-lg">
                   <span className="opacity-80">Category:</span> {selectedCategory}
+                  <button
+                    onClick={() => {
+                      audioSynth.playSwoosh();
+                      setStage('category-selection');
+                    }}
+                    className="ml-2 px-4 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-base rounded-full shadow transition-all hover:scale-105 active:translate-y-0.5 border border-white/30"
+                  >
+                    Change Category 🔄
+                  </button>
                 </div>
               )}
             </div>
@@ -1160,15 +1413,28 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               })}
             </div>
 
-            <button
-              onClick={() => {
-                audioSynth.playSwoosh();
-                setStage('score');
-              }}
-              className="mt-auto mb-8 px-8 py-4 bg-rose-500 text-white font-bold text-xl rounded-full shadow-lg hover:bg-rose-600 transition-colors"
-            >
-              End Quiz
-            </button>
+            <div className="mt-auto mb-8 flex flex-wrap items-center justify-center gap-4">
+              {categories.length > 1 && (
+                <button
+                  onClick={() => {
+                    audioSynth.playSwoosh();
+                    setStage('category-selection');
+                  }}
+                  className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xl rounded-full shadow-lg transition-all hover:scale-105 active:translate-y-1 border border-white/20"
+                >
+                  Change Category 🔄
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  audioSynth.playSwoosh();
+                  setStage('score');
+                }}
+                className="px-8 py-4 bg-rose-500 text-white font-bold text-xl rounded-full shadow-lg hover:bg-rose-600 transition-all hover:scale-105 active:translate-y-1"
+              >
+                End Quiz
+              </button>
+            </div>
           </motion.div>
         )}
 
@@ -1202,6 +1468,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             exit={{ opacity: 0, scale: 1.02 }}
             transition={{ duration: 0.5, ease: "easeInOut" }}
           >
+            {quiz.mode === 'interactive' && (
+              <ParticipantVideoFrames
+                quiz={quiz}
+                playersState={playersState}
+                currentPlayerIndex={currentPlayerIndex}
+              />
+            )}
             {isInteractiveTimeout && (
               <motion.div
                 initial={{ scale: 0.5, opacity: 0, y: -50 }}
@@ -1215,32 +1488,41 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             )}
           <motion.div
             key={`q-container-inner-${currentQuestionIndex}`}
-            className={`${quiz.mode === 'interactive' ? 'w-[75vw] ml-4 md:ml-8 mr-auto justify-center' : 'w-[90vw] mx-auto'} max-w-[1800px] h-full flex flex-col z-10 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' ? 'p-4 md:p-6' : 'p-8 md:p-12'}`}
+            className={`${quiz.mode === 'interactive' ? 'w-[calc(100%-16rem)] sm:w-[calc(100%-18rem)] md:w-[calc(100%-22rem)] lg:w-[calc(100%-25rem)] ml-2 sm:ml-4 md:ml-8 mr-auto justify-center' : 'w-[90vw] mx-auto'} max-w-[1800px] h-full flex flex-col z-10 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' ? 'p-4 md:p-6' : 'p-8 md:p-12'}`}
           >
             {/* Top Bar */}
             {/* Milestone Progress Bar */}
-            <div className="w-full mb-6 mt-2">
-              <div className="flex justify-between text-white/90 font-bold mb-2 text-sm uppercase tracking-wider">
-                <span>Milestone Progress</span>
-                <span>{Math.floor(currentQuestionIndex / 5)} of {Math.ceil((quiz.questions.length || 1) / 5)} Badges</span>
-              </div>
-              <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden relative shadow-inner">
-                <motion.div 
-                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-300 to-yellow-500"
-                  initial={{ width: `${(Math.max(0, currentQuestionIndex) / (quiz.questions.length || 1)) * 100}%` }}
-                  animate={{ width: `${((currentQuestionIndex + (stage === 'reveal' ? 1 : 0)) / (quiz.questions.length || 1)) * 100}%` }}
-                  transition={{ duration: 0.8, ease: "easeOut" }}
-                />
-                {/* Milestone markers */}
-                {Array.from({ length: Math.ceil((quiz.questions.length || 1) / 5) }).map((_, i) => (
-                  <div 
-                    key={i} 
-                    className="absolute top-0 w-1 h-full bg-white/40 shadow-sm" 
-                    style={{ left: `${((i + 1) * 5 / (quiz.questions.length || 1)) * 100}%` }} 
-                  />
-                ))}
-              </div>
-            </div>
+            {quiz.showBadges !== false && (() => {
+              const totalQ = quiz.questions.length || 1;
+              const maxBadges = Math.min(4, Math.max(1, Math.ceil(totalQ / 5)));
+              const badgeInterval = Math.max(5, Math.ceil(totalQ / maxBadges));
+              const earnedCount = Math.min(maxBadges, Math.floor(currentQuestionIndex / badgeInterval));
+
+              return (
+                <div className="w-full mb-6 mt-2">
+                  <div className="flex justify-between text-white/90 font-bold mb-2 text-sm uppercase tracking-wider">
+                    <span>Milestone Progress</span>
+                    <span>{earnedCount} of {maxBadges} Badges</span>
+                  </div>
+                  <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden relative shadow-inner">
+                    <motion.div 
+                      className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-300 to-yellow-500"
+                      initial={{ width: `${(Math.max(0, currentQuestionIndex) / totalQ) * 100}%` }}
+                      animate={{ width: `${((currentQuestionIndex + (stage === 'reveal' ? 1 : 0)) / totalQ) * 100}%` }}
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                    />
+                    {/* Milestone markers */}
+                    {Array.from({ length: maxBadges }).map((_, i) => (
+                      <div 
+                        key={i} 
+                        className="absolute top-0 w-1 h-full bg-white/40 shadow-sm" 
+                        style={{ left: `${Math.min(100, ((i + 1) * badgeInterval / totalQ) * 100)}%` }} 
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             
             {/* Top Bar */}
             <div className={`w-full flex ${quiz.mode === 'interactive' ? 'justify-start gap-4 md:gap-6 flex-wrap' : 'justify-between'} items-center ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' ? 'mb-4 md:mb-6' : 'mb-10'}`}>
@@ -1257,7 +1539,11 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               )}
               <div className="bg-indigo-700 text-white px-8 py-3 rounded-full shadow-2xl font-black text-2xl tracking-widest uppercase flex items-center gap-3 border-4 border-indigo-400">
                 <Star className="w-6 h-6 text-yellow-300 fill-current" />
-                <span>{quiz.mode === 'interactive' && quiz.teamName ? `${quiz.teamName} | ${quiz.title}` : quiz.title}</span>
+                <span>
+                  {quiz.mode === 'interactive' && isMultipleFiles
+                    ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
+                    : (quiz.mode === 'interactive' && quiz.teamName ? `${quiz.teamName} | ${quiz.title}` : quiz.title)}
+                </span>
                 <Star className="w-6 h-6 text-yellow-300 fill-current" />
               </div>
 
@@ -1328,15 +1614,15 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             ) : (
               <>
-                <div className={`bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col ${quiz.mode === 'interactive' ? 'items-start justify-center' : 'items-center justify-center'} border-b-[12px] border-slate-200 z-10 relative pt-16 md:pt-20 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'px-6 pb-6 md:px-8 md:pb-8 mb-6 gap-6 shrink-0' : quiz.type === 'find-in-map' ? `px-6 pb-6 md:px-8 md:pb-8 mb-6 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-6` : `px-8 pb-8 md:px-12 md:pb-12 mb-8 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-8`}`}>
+                <div className={`bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col ${quiz.mode === 'interactive' ? 'items-start text-left justify-center' : 'items-center justify-center'} border-b-[12px] border-slate-200 z-10 relative pt-16 md:pt-20 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'px-6 pb-6 md:px-8 md:pb-8 mb-6 gap-6 shrink-0' : quiz.type === 'find-in-map' ? `px-6 pb-6 md:px-8 md:pb-8 mb-6 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-6` : `px-8 pb-8 md:px-12 md:pb-12 mb-8 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-8`}`}>
                   
 
 
-              <div className={`flex flex-col md:flex-row items-center ${quiz.mode === 'interactive' ? 'justify-start' : 'justify-center'} w-full ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'gap-8' : 'gap-12'}`}>
+              <div className={`flex flex-col md:flex-row items-center ${quiz.mode === 'interactive' ? 'justify-start text-left' : 'justify-center'} w-full ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'gap-8' : 'gap-12'}`}>
                 {question.imageUrl && !imageError && quiz.type !== 'find-in-map' && (
                   <div className={
                     (question.type?.toLowerCase() === 'identify' || quiz.type?.toLowerCase() === 'identify' || quiz.type === 'identify-image' || quiz.topic?.toLowerCase().startsWith('identify'))
-                      ? "w-full max-w-4xl h-[40vh] md:h-[500px] rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 mx-auto"
+                      ? "w-full max-w-4xl h-[40vh] md:h-[500px] rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 mx-0"
                       : `shrink-0 rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'w-40 h-40 md:w-48 md:h-48' : 'w-48 h-48 md:w-72 md:h-72'}`
                   }>
                     <img 
@@ -1357,8 +1643,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
               
               {quiz.type === 'jumbled-letters' && (
-                <div className="flex flex-col items-center gap-8 w-full mt-2">
-                  <div className="flex flex-wrap gap-3 md:gap-4 justify-center">
+                <div className={`flex flex-col ${quiz.mode === 'interactive' ? 'items-start text-left' : 'items-center'} gap-8 w-full mt-2`}>
+                  <div className={`flex flex-wrap gap-3 md:gap-4 ${quiz.mode === 'interactive' ? 'justify-start' : 'justify-center'}`}>
                     {(() => {
                       const word = question.correctAnswer.replace(/\s/g, '').toUpperCase();
                       const letterObjects = word.split('').map((char, i) => ({ char, id: i }));
@@ -1695,8 +1981,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             )}
 
             {quiz.type !== 'text-presentation' && quiz.type !== '5-clues' && quiz.type !== 'detective' && quiz.type !== 'jumbled-letters' && quiz.type !== 'match-the-following' && quiz.type !== 'word-search' && (
-              <div className="flex flex-col w-full">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full shrink-0 mb-6">
+              <div className={`flex flex-col w-full ${quiz.mode === 'interactive' ? 'items-start text-left' : 'items-center'}`}>
+                <div className={`grid grid-cols-1 ${quiz.mode === 'interactive' ? 'lg:grid-cols-2' : 'md:grid-cols-2'} gap-6 w-full shrink-0 mb-6`}>
                   {question.options?.map((option, i) => {
                     const isCorrect = option === question.correctAnswer;
                     const isReveal = stage === 'reveal';
@@ -1767,7 +2053,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 
                 {stage === 'reveal' && quiz.mode === 'interactive' && quiz.isMultiplayer && (() => {
                   let isInteractiveCorrect = false;
-                  if (quiz.type === 'detective') {
+                  if ((quiz.type as string) === 'detective') {
                     isInteractiveCorrect = interactiveOptionClicked === (question.sentences && question.fakeSentenceIndex !== undefined ? question.sentences[question.fakeSentenceIndex] : undefined);
                   } else {
                     isInteractiveCorrect = interactiveOptionClicked === question.correctAnswer;
@@ -1880,15 +2166,17 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   </motion.div>
                 ))}
                 
-                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: (quiz.players?.length || 1) * 0.5 + 1 }}
-                  onClick={() => setStage('badges')}
-                  className="mt-8 mx-auto px-8 py-4 bg-white text-indigo-600 rounded-full font-bold text-xl md:text-2xl shadow-xl hover:bg-indigo-50 transition-all"
-                >
-                  See Badges
-                </motion.button>
+                <div className="mt-8 flex flex-wrap justify-center gap-4">
+                  <motion.button
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: (quiz.players?.length || 1) * 0.5 + 1 }}
+                    onClick={() => setStage('badges')}
+                    className="px-8 py-4 bg-white text-indigo-600 rounded-full font-bold text-xl md:text-2xl shadow-xl hover:bg-indigo-50 transition-all"
+                  >
+                    See Badges
+                  </motion.button>
+                </div>
               </div>
             ) : (
               <>
@@ -1923,6 +2211,20 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                     👏
                   </motion.div>
                 </div>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                  className="mt-10 flex flex-wrap justify-center gap-4"
+                >
+                  <button
+                    onClick={() => setStage('badges')}
+                    className="px-8 py-4 bg-white text-indigo-600 rounded-full font-bold text-xl md:text-2xl shadow-xl hover:bg-indigo-50 transition-all"
+                  >
+                    See Badges
+                  </button>
+                </motion.div>
               </>
             )}
           </motion.div>
@@ -1934,40 +2236,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             ? answeredQuestions.size 
             : currentQuestionIndex + 1;
             
-          const badgeIndex = Math.floor(numAnswered / 5) - 1;
-      const milestoneTiers = [
-        [
-          { title: "Bronze Scholar", icon: "🥉", description: "Great start, keep it up!", color: "border-amber-700", text: "text-amber-800" },
-          { title: "Bronze Explorer", icon: "🥉", description: "Making good progress!", color: "border-amber-700", text: "text-amber-800" },
-          { title: "Bronze Rookie", icon: "🥉", description: "A solid beginning!", color: "border-amber-700", text: "text-amber-800" }
-        ],
-        [
-          { title: "Silver Thinker", icon: "🥈", description: "You're on a roll!", color: "border-slate-300", text: "text-slate-500" },
-          { title: "Silver Brainiac", icon: "🥈", description: "Impressive streak!", color: "border-slate-300", text: "text-slate-500" },
-          { title: "Silver Achiever", icon: "🥈", description: "Moving up the ranks!", color: "border-slate-300", text: "text-slate-500" }
-        ],
-        [
-          { title: "Gold Mastermind", icon: "🥇", description: "Halfway to genius!", color: "border-yellow-400", text: "text-yellow-600" },
-          { title: "Gold Champion", icon: "🥇", description: "Shining bright!", color: "border-yellow-400", text: "text-yellow-600" },
-          { title: "Gold Virtuoso", icon: "🥇", description: "Exceptional skills!", color: "border-yellow-400", text: "text-yellow-600" }
-        ],
-        [
-          { title: "Diamond Genius", icon: "💎", description: "Incredible knowledge!", color: "border-cyan-300", text: "text-cyan-500" },
-          { title: "Diamond Elite", icon: "💎", description: "Top tier performance!", color: "border-cyan-300", text: "text-cyan-500" },
-          { title: "Diamond Star", icon: "💎", description: "Flawless execution!", color: "border-cyan-300", text: "text-cyan-500" }
-        ],
-        [
-          { title: "Legendary Expert", icon: "👑", description: "Unstoppable force!", color: "border-fuchsia-400", text: "text-fuchsia-600" },
-          { title: "Legendary Titan", icon: "👑", description: "Absolute mastery!", color: "border-fuchsia-400", text: "text-fuchsia-600" },
-          { title: "Mythic Hero", icon: "👑", description: "Beyond comparison!", color: "border-fuchsia-400", text: "text-fuchsia-600" }
-        ]
-      ];
-      
-      const safeBadgeIndex = Math.min(Math.max(0, badgeIndex), milestoneTiers.length - 1);
-      // Use a stable seed based on badge index and quiz length
-      const seed = safeBadgeIndex + (quiz.questions.length * 3);
-      const tierOptions = milestoneTiers[safeBadgeIndex];
-      const currentBadge = tierOptions[seed % tierOptions.length];
+          const currentBadge = getDynamicMilestoneBadge(numAnswered);
           
           return (
           <motion.div
@@ -1977,7 +2246,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             className="text-center p-12 max-w-7xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full"
           >
              <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-2xl mb-12">
-               {quiz.mode === 'interactive' ? 'Milestone Reached!' : 'Audience Milestone!'}
+               {quiz.mode === 'interactive' ? `${currentBadge.player}'s Milestone!` : 'Audience Milestone!'}
              </h1>
              <motion.div
                 initial={{ scale: 0, opacity: 0, y: 50 }}
@@ -1989,7 +2258,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 <h3 className={`text-3xl md:text-5xl font-black ${currentBadge.text} mb-4`}>{currentBadge.title}</h3>
                 <p className="text-xl md:text-2xl text-slate-600 font-bold">{currentBadge.description}</p>
                 <div className="mt-6 py-2 px-6 bg-slate-100 rounded-full font-bold text-slate-500">
-                  {numAnswered} Questions Completed!
+                  {numAnswered} Questions Completed in {currentBadge.contextTopic}!
                 </div>
               </motion.div>
           </motion.div>
@@ -2023,7 +2292,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                ))}
              </div>
              
-             <motion.button
+             <div className="mt-16 flex flex-wrap justify-center gap-6">
+               <motion.button
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: earnedBadges.length * 0.4 + 1 }}
@@ -2034,10 +2304,11 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       setStage('outro');
                     }
                   }}
-                  className="mt-16 mx-auto px-10 py-5 bg-yellow-400 text-yellow-900 rounded-full font-black text-2xl shadow-[0_10px_0_rgba(202,138,4,1)] hover:translate-y-2 hover:shadow-none transition-all"
+                  className="px-10 py-5 bg-yellow-400 text-yellow-900 rounded-full font-black text-2xl shadow-[0_10px_0_rgba(202,138,4,1)] hover:translate-y-2 hover:shadow-none transition-all"
                 >
                   Continue
-             </motion.button>
+               </motion.button>
+             </div>
           </motion.div>
         )}
 
@@ -2078,66 +2349,255 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             key="outro"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-center p-12 max-w-5xl flex flex-col items-center justify-center h-full z-10 mx-auto"
+            className="text-center p-6 md:p-12 max-w-6xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full"
           >
             {quiz.mode === 'interactive' ? (
-              <>
-                <div className="relative mb-8 flex justify-center items-center">
-                  <Star className="w-40 h-40 text-yellow-300 drop-shadow-[0_0_50px_rgba(250,204,21,0.8)] animate-pulse" />
+              <div className="flex flex-col items-center justify-center w-full max-w-5xl">
+                <div className="relative mb-6 flex justify-center items-center">
+                  <Star className="w-28 h-28 md:w-36 md:h-36 text-yellow-300 drop-shadow-[0_0_50px_rgba(250,204,21,0.8)] animate-pulse" />
                 </div>
-                <h1 className="text-5xl md:text-7xl font-black mb-6 text-white drop-shadow-2xl">
+                <h1 className="text-4xl md:text-7xl font-black mb-3 text-white drop-shadow-2xl uppercase tracking-tight">
                   Thank you for participating!
                 </h1>
-                <p className="text-2xl md:text-3xl font-medium opacity-90 text-white">
+                <p className="text-2xl md:text-3xl font-extrabold text-cyan-200 drop-shadow-md mb-8">
                   Great job, {quiz.teamName || 'Player 1'}!
                 </p>
-                <button
-                  onClick={onExit}
-                  className="mt-12 px-8 py-4 bg-white text-indigo-600 rounded-full font-bold text-xl md:text-2xl shadow-xl hover:bg-indigo-50 transition-all active:scale-95"
-                >
-                  Play Again
-                </button>
-              </>
-            ) : (
-              <>
-                <motion.div 
-                  animate={{ y: [0, -20, 0] }} 
-                  transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-                  className="w-56 h-56 md:w-72 md:h-72 rounded-full overflow-hidden shadow-[0_0_80px_rgba(255,255,255,0.6)] border-8 border-white mb-8"
-                >
-                  <img src={quizLogo} alt="Quiz Time Brain Boosters" className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-700" />
-                </motion.div>
 
-                <div className="relative mb-8 flex justify-center items-center">
-                  <Trophy className="w-32 h-32 text-yellow-300 drop-shadow-[0_0_50px_rgba(250,204,21,0.8)]" />
-                  <Star className="w-12 h-12 text-yellow-100 absolute -top-4 -right-8 animate-spin-slow" />
-                  <Sparkles className="w-10 h-10 text-yellow-100 absolute top-4 -left-8 animate-ping" />
+                {/* Animated Call-to-Action Cards for LIKE, SUBSCRIBE & SHARE */}
+                <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 w-full mb-8">
+                  
+                  {/* LIKE CARD */}
+                  <motion.div
+                    initial={{ scale: 0.8, y: 30, opacity: 0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+                    className="bg-white/15 backdrop-blur-md border-2 border-white/30 rounded-3xl p-6 md:p-8 flex flex-col items-center shadow-[0_15px_35px_rgba(0,0,0,0.3)] hover:bg-white/25 transition-all min-w-[220px] md:min-w-[260px]"
+                  >
+                    <motion.div
+                      animate={{ 
+                        scale: [1, 1.25, 1],
+                        rotate: [0, -12, 12, 0]
+                      }}
+                      transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
+                      className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-3xl flex items-center justify-center text-white shadow-xl mb-4 border-3 border-white/40"
+                    >
+                      <ThumbsUp className="w-12 h-12 md:w-16 md:h-16 fill-white text-blue-600 drop-shadow-md" />
+                    </motion.div>
+                    <span className="text-3xl md:text-4xl font-black text-white tracking-wide uppercase drop-shadow">LIKE</span>
+                    <span className="text-sm md:text-base font-bold text-cyan-200 mt-1">Hit the Thumb!</span>
+                  </motion.div>
+
+                  {/* SUBSCRIBE CARD (PROMINENT YOUTUBE RED & LARGE) */}
+                  <motion.div
+                    initial={{ scale: 0.8, y: 30, opacity: 0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    transition={{ delay: 0.4, type: 'spring', stiffness: 200 }}
+                    className="bg-gradient-to-b from-red-600 via-rose-600 to-red-700 border-4 border-white/60 rounded-3xl p-7 md:p-9 flex flex-col items-center shadow-[0_25px_60px_rgba(225,29,72,0.7)] hover:scale-105 transition-all relative overflow-hidden min-w-[260px] md:min-w-[320px]"
+                  >
+                    {/* Animated Light Shimmer */}
+                    <motion.div 
+                      animate={{ x: ['-100%', '200%'] }}
+                      transition={{ repeat: Infinity, duration: 2.2, ease: "linear", repeatDelay: 0.8 }}
+                      className="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/40 to-transparent transform -skew-x-12 pointer-events-none"
+                    />
+
+                    <div className="flex items-center gap-4 mb-4">
+                      <motion.div
+                        animate={{ rotate: [-25, 25, -20, 20, 0], scale: [1, 1.2, 1] }}
+                        transition={{ repeat: Infinity, duration: 1.5, repeatDelay: 0.3 }}
+                        className="bg-white text-red-600 rounded-full p-3 shadow-lg"
+                      >
+                        <Bell className="w-9 h-9 md:w-12 md:h-12 fill-current" />
+                      </motion.div>
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ repeat: Infinity, duration: 1.8 }}
+                        className="bg-white text-red-600 rounded-2xl p-3 shadow-lg flex items-center justify-center"
+                      >
+                        <Youtube className="w-10 h-10 md:w-14 md:h-14 fill-current" />
+                      </motion.div>
+                    </div>
+
+                    <span className="text-3xl md:text-5xl font-black text-white tracking-wider uppercase drop-shadow-lg">SUBSCRIBE</span>
+                    <span className="text-sm md:text-base font-black text-white bg-black/30 px-4 py-1.5 rounded-full mt-3 border border-white/30 shadow-inner">
+                      🔔 Turn on Notifications!
+                    </span>
+                  </motion.div>
+
+                  {/* SHARE CARD */}
+                  <motion.div
+                    initial={{ scale: 0.8, y: 30, opacity: 0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    transition={{ delay: 0.6, type: 'spring', stiffness: 200 }}
+                    className="bg-white/15 backdrop-blur-md border-2 border-white/30 rounded-3xl p-6 md:p-8 flex flex-col items-center shadow-[0_15px_35px_rgba(0,0,0,0.3)] hover:bg-white/25 transition-all min-w-[220px] md:min-w-[260px]"
+                  >
+                    <motion.div
+                      animate={{ 
+                        y: [0, -10, 0],
+                        rotate: [0, 10, -10, 0]
+                      }}
+                      transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                      className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-3xl flex items-center justify-center text-white shadow-xl mb-4 border-3 border-white/40"
+                    >
+                      <Share2 className="w-12 h-12 md:w-16 md:h-16 text-white drop-shadow-md" />
+                    </motion.div>
+                    <span className="text-3xl md:text-4xl font-black text-white tracking-wide uppercase drop-shadow">SHARE</span>
+                    <span className="text-sm md:text-base font-bold text-pink-200 mt-1">Share with Friends!</span>
+                  </motion.div>
+
                 </div>
 
-                <h1 className="text-6xl md:text-8xl font-black mb-6 text-white drop-shadow-2xl">
+                <div className="mt-6 flex items-center justify-center gap-6">
+                  <button
+                    onClick={onExit}
+                    className="px-8 py-4 bg-white text-indigo-600 rounded-full font-bold text-xl md:text-2xl shadow-xl hover:bg-indigo-50 transition-all active:scale-95"
+                  >
+                    Play Again
+                  </button>
+                  <button
+                    onClick={handleExportResults}
+                    title="Export Results (JSON)"
+                    aria-label="Export Results (JSON)"
+                    className="p-4 bg-white/20 hover:bg-white/30 text-white rounded-full shadow-xl border-2 border-white/40 transition-all hover:scale-110 active:scale-95 flex items-center justify-center"
+                  >
+                    <Download className="w-7 h-7 md:w-8 md:h-8 text-yellow-300 drop-shadow" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center w-full max-w-5xl">
+                {/* Logo & Trophy */}
+                <div className="flex items-center justify-center gap-6 mb-6">
+                  <motion.div 
+                    animate={{ y: [0, -10, 0], scale: [1, 1.03, 1] }} 
+                    transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                    className="w-32 h-32 md:w-44 md:h-44 rounded-full overflow-hidden shadow-[0_0_60px_rgba(255,255,255,0.7)] border-6 border-white relative group"
+                  >
+                    <img src={quizLogo} alt="Quiz Time Brain Boosters" className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-700" />
+                  </motion.div>
+                  <div className="relative flex justify-center items-center">
+                    <Trophy className="w-24 h-24 md:w-32 md:h-32 text-yellow-300 drop-shadow-[0_0_50px_rgba(250,204,21,0.8)]" />
+                    <Star className="w-10 h-10 text-yellow-100 absolute -top-3 -right-6 animate-spin-slow" />
+                    <Sparkles className="w-8 h-8 text-yellow-100 absolute top-3 -left-6 animate-ping" />
+                  </div>
+                </div>
+
+                <h1 className="text-5xl md:text-7xl font-black mb-3 text-white drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] uppercase tracking-tight">
                   {outroMessage.title}
                 </h1>
-                <p className="text-3xl md:text-5xl font-bold opacity-100 text-cyan-100 drop-shadow-lg mb-4">
+                <p className="text-2xl md:text-4xl font-extrabold opacity-100 text-cyan-200 drop-shadow-md mb-8">
                   {outroMessage.subtitle}
                 </p>
-                <p className="text-2xl md:text-3xl font-medium opacity-90 text-white">
+
+                {/* Animated Call-to-Action Cards for LIKE, SUBSCRIBE & SHARE */}
+                <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 w-full mb-8">
+                  
+                  {/* LIKE CARD */}
+                  <motion.div
+                    initial={{ scale: 0.8, y: 30, opacity: 0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+                    className="bg-white/15 backdrop-blur-md border-2 border-white/30 rounded-3xl p-6 md:p-8 flex flex-col items-center shadow-[0_15px_35px_rgba(0,0,0,0.3)] hover:bg-white/25 transition-all min-w-[220px] md:min-w-[260px]"
+                  >
+                    <motion.div
+                      animate={{ 
+                        scale: [1, 1.25, 1],
+                        rotate: [0, -12, 12, 0]
+                      }}
+                      transition={{ repeat: Infinity, duration: 1.8, ease: "easeInOut" }}
+                      className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-tr from-blue-600 to-cyan-400 rounded-3xl flex items-center justify-center text-white shadow-xl mb-4 border-3 border-white/40"
+                    >
+                      <ThumbsUp className="w-12 h-12 md:w-16 md:h-16 fill-white text-blue-600 drop-shadow-md" />
+                    </motion.div>
+                    <span className="text-3xl md:text-4xl font-black text-white tracking-wide uppercase drop-shadow">LIKE</span>
+                    <span className="text-sm md:text-base font-bold text-cyan-200 mt-1">Hit the Thumb!</span>
+                  </motion.div>
+
+                  {/* SUBSCRIBE CARD (PROMINENT YOUTUBE RED & LARGE) */}
+                  <motion.div
+                    initial={{ scale: 0.8, y: 30, opacity: 0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    transition={{ delay: 0.4, type: 'spring', stiffness: 200 }}
+                    className="bg-gradient-to-b from-red-600 via-rose-600 to-red-700 border-4 border-white/60 rounded-3xl p-7 md:p-9 flex flex-col items-center shadow-[0_25px_60px_rgba(225,29,72,0.7)] hover:scale-105 transition-all relative overflow-hidden min-w-[260px] md:min-w-[320px]"
+                  >
+                    {/* Animated Light Shimmer */}
+                    <motion.div 
+                      animate={{ x: ['-100%', '200%'] }}
+                      transition={{ repeat: Infinity, duration: 2.2, ease: "linear", repeatDelay: 0.8 }}
+                      className="absolute inset-0 w-1/2 bg-gradient-to-r from-transparent via-white/40 to-transparent transform -skew-x-12 pointer-events-none"
+                    />
+
+                    <div className="flex items-center gap-4 mb-4">
+                      <motion.div
+                        animate={{ rotate: [-25, 25, -20, 20, 0], scale: [1, 1.2, 1] }}
+                        transition={{ repeat: Infinity, duration: 1.5, repeatDelay: 0.3 }}
+                        className="bg-white text-red-600 rounded-full p-3 shadow-lg"
+                      >
+                        <Bell className="w-9 h-9 md:w-12 md:h-12 fill-current" />
+                      </motion.div>
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ repeat: Infinity, duration: 1.8 }}
+                        className="bg-white text-red-600 rounded-2xl p-3 shadow-lg flex items-center justify-center"
+                      >
+                        <Youtube className="w-10 h-10 md:w-14 md:h-14 fill-current" />
+                      </motion.div>
+                    </div>
+
+                    <span className="text-3xl md:text-5xl font-black text-white tracking-wider uppercase drop-shadow-lg">SUBSCRIBE</span>
+                    <span className="text-sm md:text-base font-black text-white bg-black/30 px-4 py-1.5 rounded-full mt-3 border border-white/30 shadow-inner">
+                      🔔 Turn on Notifications!
+                    </span>
+                  </motion.div>
+
+                  {/* SHARE CARD */}
+                  <motion.div
+                    initial={{ scale: 0.8, y: 30, opacity: 0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    transition={{ delay: 0.6, type: 'spring', stiffness: 200 }}
+                    className="bg-white/15 backdrop-blur-md border-2 border-white/30 rounded-3xl p-6 md:p-8 flex flex-col items-center shadow-[0_15px_35px_rgba(0,0,0,0.3)] hover:bg-white/25 transition-all min-w-[220px] md:min-w-[260px]"
+                  >
+                    <motion.div
+                      animate={{ 
+                        y: [0, -10, 0],
+                        rotate: [0, 10, -10, 0]
+                      }}
+                      transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                      className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-tr from-purple-600 to-pink-500 rounded-3xl flex items-center justify-center text-white shadow-xl mb-4 border-3 border-white/40"
+                    >
+                      <Share2 className="w-12 h-12 md:w-16 md:h-16 text-white drop-shadow-md" />
+                    </motion.div>
+                    <span className="text-3xl md:text-4xl font-black text-white tracking-wide uppercase drop-shadow">SHARE</span>
+                    <span className="text-sm md:text-base font-bold text-pink-200 mt-1">Share with Friends!</span>
+                  </motion.div>
+
+                </div>
+
+                <p className="text-2xl md:text-3xl font-bold opacity-90 text-white drop-shadow mb-8">
                   {outroMessage.footer}
                 </p>
-              </>
+
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                  <button
+                    onClick={onExit}
+                    className="px-8 py-4 bg-white text-indigo-700 rounded-full font-bold text-lg md:text-xl shadow-lg hover:bg-indigo-50 transition-all active:scale-95"
+                  >
+                    Exit Session
+                  </button>
+                  <button
+                    onClick={handleExportResults}
+                    title="Export Results (JSON)"
+                    aria-label="Export Results (JSON)"
+                    className="p-4 bg-white/20 hover:bg-white/30 text-white rounded-full shadow-lg border-2 border-white/40 transition-all hover:scale-110 active:scale-95 flex items-center justify-center"
+                  >
+                    <Download className="w-7 h-7 text-yellow-300 drop-shadow" />
+                  </button>
+                </div>
+              </div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
-      
-      {/* YouTube Style Progress Bar */}
-      <div className="absolute bottom-0 left-0 w-full h-3 bg-black/20 z-50">
-        <motion.div
-          className="h-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]"
-          initial={{ width: 0 }}
-          animate={{ width: `${stage === 'outro' ? 100 : ((currentQuestionIndex) / quiz.questions.length) * 100}%` }}
-          transition={{ duration: 0.5 }}
-        />
-      </div>
     </div>
   );
 }

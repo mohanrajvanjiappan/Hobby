@@ -34,6 +34,9 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
   const [playerPhoto, setPlayerPhoto] = useState<string>('');
   const [playerDetails, setPlayerDetails] = useState('');
   const [participantTopic, setParticipantTopic] = useState('');
+  const [frameSize, setFrameSize] = useState<'small' | 'medium' | 'large'>('large');
+  const [showFrames, setShowFrames] = useState<boolean>(true);
+  const [showBadges, setShowBadges] = useState<boolean>(true);
   const [setupMode, setSetupMode] = useState<'quiz' | 'presentation'>('quiz');
   const [presentationContent, setPresentationContent] = useState('');
   const [presentationDuration, setPresentationDuration] = useState(5);
@@ -210,7 +213,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
     audioSynth.setMusicPreference(musicEnabled);
     
     if (cachedQuiz && quizType === 'identify-image') {
-      const q = { ...cachedQuiz, mode };
+      const q = { ...cachedQuiz, mode, showBadges };
       if (mode === 'interactive') {
         setPendingInteractiveQuiz(q);
       } else {
@@ -242,6 +245,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
       }
       
       data.mode = mode;
+      data.showBadges = showBadges;
       
       if (quizType === 'identify-image' && identifyMode === 'custom') {
         data.questions = data.questions.map((q: any) => {
@@ -407,45 +411,95 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
     URL.revokeObjectURL(url);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files: File[] = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string) as Quiz;
-        json.isOfflineMode = true;
-        if (json.questions && Array.isArray(json.questions)) {
-          
-          if (json.type === 'word-search') {
-            json.questions = json.questions.map(q => {
-              if (q.wordsToFind && (!q.grid || !q.wordLocations)) {
-                const { grid, wordLocations, wordsToFind } = generateWordSearchGrid(q.wordsToFind);
-                return { ...q, grid, wordLocations, wordsToFind };
-              }
-              return q;
-            });
+    try {
+      let combinedQuestions: any[] = [];
+      let combinedQuotes: any[] = [];
+      let firstTitle = '';
+      let firstTopic = '';
+      let firstType = '';
+
+      for (const file of files) {
+        const fallbackCategory = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+        const text = await file.text();
+        const json = JSON.parse(text);
+
+        // Fetch category from top-level title field if available
+        const fileCategory = (json && !Array.isArray(json) && json.title)
+          ? json.title
+          : ((json && !Array.isArray(json) && json.topic) ? json.topic : fallbackCategory);
+
+        if (Array.isArray(json)) {
+          const items = json.map(item => ({
+            ...item,
+            category: (files.length > 1) ? fileCategory : (item.category || fileCategory)
+          }));
+          combinedQuestions.push(...items);
+        } else if (json && json.questions && Array.isArray(json.questions)) {
+          if (!firstTitle) firstTitle = json.title || json.topic;
+          if (!firstTopic) firstTopic = json.topic;
+          if (!firstType) firstType = json.type;
+
+          if (json.quotes && Array.isArray(json.quotes)) {
+            combinedQuotes.push(...json.quotes);
           }
 
-          // Prime speech synthesis
-          if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance('');
-            utterance.volume = 0;
-            window.speechSynthesis.speak(utterance);
-          }
-          audioSynth.setVoicePreference(voicePreference);
-    audioSynth.setMusicPreference(musicEnabled);
-          setLoadedOfflineQuiz(json);
+          const questionsWithCategory = json.questions.map((q: any) => ({
+            ...q,
+            category: (files.length > 1) ? fileCategory : (q.category || fileCategory)
+          }));
+          combinedQuestions.push(...questionsWithCategory);
         } else {
-          setError("Invalid JSON format. Must contain 'questions' array.");
+          console.warn(`Skipping invalid JSON in ${file.name}`);
         }
-      } catch (err) {
-        setError("Error parsing JSON file. Please ensure it's valid JSON.");
       }
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.readAsText(file);
+
+      if (combinedQuestions.length === 0) {
+        setError("Invalid JSON format. Expected an array or a Quiz object with a 'questions' array.");
+        return;
+      }
+
+      combinedQuestions = combinedQuestions.map(q => {
+        if (q.wordsToFind && (!q.grid || !q.wordLocations)) {
+          const { grid, wordLocations, wordsToFind } = generateWordSearchGrid(q.wordsToFind);
+          return { ...q, grid, wordLocations, wordsToFind };
+        }
+        return q;
+      });
+
+      // Prime speech synthesis
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance('');
+        utterance.volume = 0;
+        window.speechSynthesis.speak(utterance);
+      }
+      audioSynth.setVoicePreference(voicePreference);
+      audioSynth.setMusicPreference(musicEnabled);
+
+      const combinedQuiz: Quiz = {
+        title: files.length > 1 ? `Combined Quiz (${files.length} Files Loaded)` : (firstTitle || files[0].name.replace(/\.[^/.]+$/, "")),
+        topic: firstTopic || (files.length > 1 ? "Multiple JSON Files" : files[0].name.replace(/\.[^/.]+$/, "")),
+        type: (firstType as any) || "multiple-choice",
+        theme: {
+          primaryColor: "#4f46e5",
+          secondaryColor: "#818cf8",
+          textColor: "#ffffff"
+        },
+        questions: combinedQuestions,
+        quotes: combinedQuotes.length > 0 ? combinedQuotes : undefined,
+        isOfflineMode: true,
+        isMultipleFilesLoaded: files.length > 1,
+      };
+
+      setLoadedOfflineQuiz(combinedQuiz);
+      setError('');
+    } catch (err) {
+      setError("Error parsing JSON file(s). Please ensure valid JSON formatting.");
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   
@@ -481,7 +535,8 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
         throw new Error(data.error || 'Failed to generate presentation');
       }
       
-      if (mode === 'interactive') { setPendingInteractiveQuiz({ ...data, mode }); } else { onQuizGenerated({ ...data, mode }); }
+      data.showBadges = showBadges;
+      if (mode === 'interactive') { setPendingInteractiveQuiz({ ...data, mode, showBadges }); } else { onQuizGenerated({ ...data, mode, showBadges }); }
     } catch (err: any) {
       setError(err.message || 'An error occurred while generating.');
     } finally {
@@ -608,7 +663,7 @@ return (
             <div className="flex flex-col sm:flex-row gap-4 mt-8">
               <button
                 type="button"
-                onClick={() => onQuizGenerated({ ...loadedOfflineQuiz, mode: 'video' })}
+                onClick={() => onQuizGenerated({ ...loadedOfflineQuiz, mode: 'video', showBadges })}
                 className="flex-1 py-4 rounded-xl bg-emerald-600 text-white font-bold text-lg hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/30 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
               >
                 <Play className="w-6 h-6 fill-current" />
@@ -617,7 +672,7 @@ return (
               <button
                 type="button"
                 onClick={() => {
-                  setPendingInteractiveQuiz({ ...loadedOfflineQuiz, mode: 'interactive' });
+                  setPendingInteractiveQuiz({ ...loadedOfflineQuiz, mode: 'interactive', showBadges });
                   setLoadedOfflineQuiz(null);
                 }}
                 className="flex-1 py-4 rounded-xl bg-fuchsia-600 text-white font-bold text-lg hover:bg-fuchsia-700 focus:outline-none focus:ring-4 focus:ring-fuchsia-500/30 transition-all flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-600/20"
@@ -640,6 +695,34 @@ return (
             <h2 className="text-2xl font-bold text-slate-800 text-center">Interactive Setup</h2>
             
             <div className="space-y-4">
+              <div className="flex items-center gap-3 py-1 text-left bg-indigo-50/60 p-3 rounded-xl border border-indigo-100">
+                <input
+                  type="checkbox"
+                  id="showFrames"
+                  checked={showFrames}
+                  onChange={(e) => setShowFrames(e.target.checked)}
+                  className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 border-indigo-300 cursor-pointer"
+                />
+                <label htmlFor="showFrames" className="text-sm font-semibold text-neutral-800 cursor-pointer select-none">
+                  Show Video Camera Frames
+                </label>
+              </div>
+
+              {showFrames && (
+                <div className="space-y-2 text-left">
+                  <label className="text-sm font-semibold text-neutral-700">Participant Video Frame Size</label>
+                  <select
+                    value={frameSize}
+                    onChange={(e) => setFrameSize(e.target.value as 'small' | 'medium' | 'large')}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-indigo-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/30 bg-white"
+                  >
+                    <option value="small">Small Frame</option>
+                    <option value="medium">Medium Frame (1.25x)</option>
+                    <option value="large">Large Frame (1.5x)</option>
+                  </select>
+                </div>
+              )}
+
               <div className="space-y-2 text-left">
                 <label className="text-sm font-semibold text-neutral-700">Number of Players</label>
                 <select
@@ -755,6 +838,9 @@ return (
                   playerPhoto: players[0]?.photo || playerPhoto, 
                   playerDetails: players[0]?.details || playerDetails, 
                   participantTopic: players[0]?.topic || participantTopic,
+                  frameSize: frameSize,
+                  showFrames: showFrames,
+                  showBadges: showBadges,
                   isMultiplayer: numPlayers > 1,
                   players: players.map((p, i) => ({ ...p, name: p.name || `Player ${i + 1}` }))
                 };
@@ -898,6 +984,36 @@ return (
               </select>
             </div>
           </div>
+
+          {/* Milestone Badges Toggle */}
+          <div 
+            onClick={() => setShowBadges(!showBadges)}
+            className="p-3.5 bg-gradient-to-r from-amber-50/80 to-yellow-50/80 border-2 border-amber-200/80 rounded-xl flex items-center justify-between cursor-pointer hover:border-amber-300 transition-all shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-lg shadow-md shadow-amber-500/20">
+                🏆
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  Milestone Badges
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900 border border-amber-300/50">
+                    All Modes
+                  </span>
+                </div>
+                <div className="text-xs font-medium text-slate-600">
+                  Show milestone badges during quiz
+                </div>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={showBadges}
+              onChange={(e) => setShowBadges(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500 cursor-pointer accent-amber-600"
+            />
+          </div>
           
           {quizType === 'identify-image' && (
             <div className="mt-4 p-4 rounded-xl border border-neutral-200 bg-neutral-50/50 space-y-4">
@@ -905,16 +1021,23 @@ return (
                 <button
                   type="button"
                   onClick={() => setIdentifyMode('auto')}
-                  className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${identifyMode === 'auto' ? 'bg-white shadow-sm text-indigo-600' : 'text-neutral-500 hover:text-neutral-700'}`}
+                  className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${identifyMode === 'auto' ? 'bg-white shadow-sm text-indigo-600' : 'text-neutral-500 hover:text-neutral-700'}`}
                 >
                   AI Auto-Fetch
                 </button>
                 <button
                   type="button"
                   onClick={() => setIdentifyMode('custom')}
-                  className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${identifyMode === 'custom' ? 'bg-white shadow-sm text-indigo-600' : 'text-neutral-500 hover:text-neutral-700'}`}
+                  className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${identifyMode === 'custom' ? 'bg-white shadow-sm text-indigo-600' : 'text-neutral-500 hover:text-neutral-700'}`}
                 >
                   Custom Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIdentifyMode('json')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${identifyMode === 'json' ? 'bg-white shadow-sm text-indigo-600' : 'text-neutral-500 hover:text-neutral-700'}`}
+                >
+                  JSON Upload
                 </button>
               </div>
 
@@ -956,7 +1079,7 @@ return (
                         multiple
                         className="hidden" 
                         onChange={async (e) => {
-                          const files = Array.from(e.target.files || []);
+                          const files: File[] = Array.from(e.target.files || []);
                           if (files.length === 0) return;
                           
                           const names = files.map(f => f.name);
@@ -1126,10 +1249,11 @@ return (
               
               <label className="flex-1 py-3 px-4 rounded-xl bg-white border-2 border-indigo-100 text-indigo-600 font-bold hover:bg-indigo-50 hover:border-indigo-200 transition-all flex items-center justify-center gap-2 cursor-pointer">
                 <Upload className="w-5 h-5" />
-                Upload JSON
+                Upload JSON(s)
                 <input
                   type="file"
                   accept=".json"
+                  multiple
                   className="hidden"
                   ref={fileInputRef}
                   onChange={handleFileUpload}

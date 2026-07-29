@@ -14,6 +14,18 @@ export interface WordSearchLocation {
   cells: { r: number; c: number }[];
 }
 
+export interface WordSearchWord {
+  word: string;
+  row: number;
+  col: number;
+  direction: string;
+}
+
+export interface WordSearchData {
+  grid: string[][];
+  words: WordSearchWord[];
+}
+
 export interface QuizQuestion {
   id?: string;
   category?: string;
@@ -62,17 +74,22 @@ export interface PlayerDetails {
 
 export interface Quiz {
   isOfflineMode?: boolean;
+  isMultiplayer?: boolean;
   mode?: 'video' | 'interactive';
   teamName?: string;
   playerPhoto?: string;
   playerDetails?: string;
   participantTopic?: string;
+  frameSize?: 'small' | 'medium' | 'large';
+  showFrames?: boolean;
+  showBadges?: boolean;
+  isMultipleFilesLoaded?: boolean;
   players?: PlayerDetails[];
   title: string;
 
-  theme: QuizTheme;
+  theme?: QuizTheme;
   questions: QuizQuestion[];
-  quotes: Quote[];
+  quotes?: Quote[];
   topic: string;
   type?: 'multiple-choice' | '5-clues' | 'detective' | 'find-in-map' | 'jumbled-letters' | 'match-the-following' | 'combat-mode' | 'word-search' | 'mega-quiz' | 'identify-image' | 'text-presentation';
 }
