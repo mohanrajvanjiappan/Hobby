@@ -192,6 +192,22 @@ const ParticipantVideoFrames: React.FC<ParticipantVideoFramesProps> = ({
               </div>
             </div>
 
+            {quiz.showBadges !== false && player.badges && player.badges.length > 0 && (
+              <div className="flex items-center justify-between gap-1 px-2.5 py-1 bg-amber-400/20 backdrop-blur-md rounded-xl border border-amber-300/40 text-xs w-full overflow-hidden shadow-sm">
+                <span className="text-[10px] font-extrabold text-amber-200 uppercase tracking-wider shrink-0">
+                  Badges
+                </span>
+                <div className="flex items-center gap-1 overflow-hidden">
+                  {player.badges.slice(-5).map((b: string, bIdx: number) => (
+                    <span key={bIdx} className="text-xs drop-shadow animate-bounce">{b}</span>
+                  ))}
+                  {player.badges.length > 5 && (
+                    <span className="text-[10px] font-black text-amber-300">+{player.badges.length - 5}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Video / Camera Rectangle with Minimal Elegant Border and Clean White Space */}
             <div
               className={`relative rounded-2xl overflow-hidden transition-all duration-300 bg-white ${sizeClasses} ${
@@ -405,44 +421,99 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
 
   const question = quiz.questions[currentQuestionIndex];
 
+  const isJumbledLetters = Boolean(
+    quiz.type === 'jumbled-letters' ||
+    question?.type === 'jumbled-letters' ||
+    (question && (question.correctAnswer || question.answer || question.word || question.correct_answer || question.brand_name) && (!question.options || question.options.length === 0) && !question.combatLeft && !question.grid && !question.pairs && !question.sentences)
+  );
+
+  const jumbledLettersForQuestion = useMemo(() => {
+    if (!question) return [];
+    const rawAnswer = question.correctAnswer || question.answer || question.word || question.correct_answer || question.brand_name || '';
+    const word = rawAnswer.replace(/\s/g, '').toUpperCase();
+    if (!word) return [];
+
+    const letterObjects = word.split('').map((char, i) => ({ char, id: i }));
+    if (word.length <= 1) return letterObjects;
+
+    // Check if custom jumbled word or string is provided
+    const customJumbledString = (
+      question.jumbledWord || 
+      question.jumbled || 
+      (question.question && question.question !== 'Unjumble the word!' ? question.question : '')
+    ).replace(/\s/g, '').toUpperCase();
+    const cleanCustom = customJumbledString.replace(/[^A-Z0-9]/g, '');
+
+    if (cleanCustom.length === word.length && cleanCustom.split('').sort().join('') === word.split('').sort().join('')) {
+      let available = [...letterObjects];
+      return cleanCustom.split('').map(char => {
+        const matchIndex = available.findIndex(l => l.char === char);
+        if (matchIndex !== -1) {
+          const match = available[matchIndex];
+          available.splice(matchIndex, 1);
+          return match;
+        }
+        return { char, id: Math.random() };
+      });
+    }
+
+    // Guaranteed well-shuffled permutation
+    let bestArr = [...letterObjects];
+    let maxScrambledScore = -1;
+
+    let seed = 0;
+    for (let i = 0; i < word.length; i++) seed += word.charCodeAt(i) * (i + 1);
+    seed += (currentQuestionIndex + 1) * 9973;
+
+    const pseudoRandom = () => {
+      let x = Math.sin(seed++) * 10000;
+      return x - Math.floor(x);
+    };
+
+    for (let attempt = 0; attempt < 80; attempt++) {
+      const current = [...letterObjects];
+      for (let i = current.length - 1; i > 0; i--) {
+        const j = Math.floor(pseudoRandom() * (i + 1));
+        [current[i], current[j]] = [current[j], current[i]];
+      }
+
+      const currentStr = current.map(c => c.char).join('');
+      if (currentStr === word) continue;
+
+      let score = 0;
+      for (let j = 0; j < current.length - 1; j++) {
+        const char1 = current[j].char;
+        const char2 = current[j + 1].char;
+        let isContinuous = false;
+        for (let k = 0; k < word.length - 1; k++) {
+          if (word[k] === char1 && word[k + 1] === char2) {
+            isContinuous = true;
+            break;
+          }
+        }
+        if (!isContinuous) score++;
+      }
+
+      if (score > maxScrambledScore) {
+        maxScrambledScore = score;
+        bestArr = current;
+      }
+      if (score === current.length - 1) break;
+    }
+
+    if (bestArr.map(b => b.char).join('') === word && word.length > 1) {
+      bestArr = [...letterObjects].reverse();
+    }
+
+    return bestArr;
+  }, [currentQuestionIndex, question]);
+
   useEffect(() => {
     setImageError(false);
     setInteractiveOptionClicked(null);
     setEliminatedOptions([]);
     setJumbledInput("");
   }, [currentQuestionIndex]);
-
-  useEffect(() => {
-    if (quiz.type === 'jumbled-letters' && question) {
-      const word = question.correctAnswer.replace(/\s/g, '').toUpperCase();
-      const arr = word.split('').map((char, i) => ({ char, id: i }));
-      let bestOrder = arr.map(a => a.id).sort(() => Math.random() - 0.5);
-      let bestScore = -1;
-      
-      for (let i = 0; i < 100; i++) {
-        const current = [...arr].sort(() => Math.random() - 0.5);
-        let score = 0;
-        for (let j = 0; j < current.length - 1; j++) {
-          const char1 = current[j].char;
-          const char2 = current[j+1].char;
-          let isContinuous = false;
-          for (let k = 0; k < word.length - 1; k++) {
-            if (word[k] === char1 && word[k+1] === char2) {
-              isContinuous = true;
-              break;
-            }
-          }
-          if (!isContinuous) score++;
-        }
-        if (score > bestScore) {
-          bestScore = score;
-          bestOrder = current.map(c => c.id);
-        }
-        if (score === current.length - 1) break;
-      }
-      setJumbledOrder(bestOrder);
-    }
-  }, [currentQuestionIndex, quiz.type, question]);
 
   
   useEffect(() => {
@@ -592,7 +663,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             });
           }, 1000);
         }
-      } else if (quiz.type === '5-clues') {
+      } else if ((quiz.type === '5-clues' || question.type === '5-clues') && !isJumbledLetters) {
         setClueIndex(0);
         audioSynth.speak(question.question || 'Can you guess from these clues?');
         if (question.clues?.[0]) {
@@ -621,7 +692,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             return prev - 1;
           });
         }, 1000);
-      } else if (quiz.type === 'jumbled-letters') {
+      } else if (isJumbledLetters) {
         setClueIndex(-1);
         audioSynth.speak('Unjumble these letters!');
         const tLimit = question.timeLimit || 25;
@@ -890,7 +961,11 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       if (quiz.isMultiplayer) {
         const sorted = [...playersState].sort((a, b) => b.score - a.score);
         const winner = sorted[0];
-        audioSynth.speak(`Congratulations ${winner?.name}, you are the winner!`, () => {});
+        audioSynth.speak(`Congratulations ${winner?.name}, you are the winner!`, () => {
+          t = setTimeout(() => {
+            setStage('badges');
+          }, 3500);
+        });
       } else {
         audioSynth.speak(`Great job ${quiz.teamName || 'Player 1'}, you scored ${score} out of ${quiz.questions.length}!`, () => {
           t = setTimeout(() => {
@@ -1000,9 +1075,9 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       if (quiz.isMultiplayer) {
         const sorted = [...playersState].sort((a,b) => b.score - a.score);
         sorted.forEach((p, index) => {
-          if (p.score === quiz.questions.length * scorePerQuestion && quiz.questions.length > 0) {
+          if (index === 0 && p.score > 0) {
             generatedBadges.push(getRandomBadge('perfect', p.name));
-          } else if (p.score >= (quiz.questions.length / 2) * scorePerQuestion && quiz.questions.length > 0) {
+          } else if (p.score > 0) {
             generatedBadges.push(getRandomBadge('whiz', p.name));
           } else {
             generatedBadges.push(getRandomBadge('learner', p.name));
@@ -1125,17 +1200,25 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   const handleJumbledSubmit = () => {
     if (stage === 'reveal' || !jumbledInput.trim()) return;
     if (timerRef.current) clearInterval(timerRef.current);
-    const isCorrect = jumbledInput.trim().toLowerCase() === question.correctAnswer.toLowerCase();
+    const rawAnswer = question.correctAnswer || question.answer || question.word || question.correct_answer || question.brand_name || '';
+    const isCorrect = jumbledInput.trim().toLowerCase() === rawAnswer.trim().toLowerCase();
     
-    setInteractiveOptionClicked(isCorrect ? question.correctAnswer : jumbledInput);
+    setInteractiveOptionClicked(isCorrect ? rawAnswer : jumbledInput);
     
     if (isCorrect) {
       setScore(s => s + getAwardPoints());
-      if (quiz.isMultiplayer) {
+      if (quiz.isMultiplayer || (quiz.players && quiz.players.length > 0)) {
         setPlayersState(prev => {
           const next = [...prev];
           if (next[currentPlayerIndex]) {
-            next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + getAwardPoints() };
+            const currentBadges = next[currentPlayerIndex].badges || [];
+            const badgeIcons = ['🌟', '🏆', '🥇', '🧠', '⚡', '🎯', '👑', '💎'];
+            const newBadge = badgeIcons[currentQuestionIndex % badgeIcons.length];
+            next[currentPlayerIndex] = { 
+              ...next[currentPlayerIndex], 
+              score: (next[currentPlayerIndex].score || 0) + getAwardPoints(),
+              badges: [...currentBadges, newBadge]
+            };
           }
           return next;
         });
@@ -1667,6 +1750,81 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 </div>
               </motion.div>
             )}
+
+            {stage === 'reveal' && quiz.mode === 'interactive' && quiz.showBadges !== false && (() => {
+              const rawAnswer = (question?.correctAnswer || question?.answer || question?.word || question?.correct_answer || question?.brand_name || '').toString().trim();
+              const clicked = (interactiveOptionClicked || '').toString().trim();
+              
+              if (!clicked) return null;
+              
+              let isCorrect = false;
+              if (question?.type === 'detective' || quiz.type === 'detective') {
+                const fakeSentence = (question.sentences && question.fakeSentenceIndex !== undefined ? question.sentences[question.fakeSentenceIndex] : '').toString().trim();
+                isCorrect = clicked.toLowerCase() === fakeSentence.toLowerCase() || (rawAnswer !== '' && clicked.toLowerCase() === rawAnswer.toLowerCase());
+              } else if (question?.type === 'match-the-following' || quiz.type === 'match-the-following' || question?.type === 'word-search' || quiz.type === 'word-search') {
+                isCorrect = true;
+              } else {
+                isCorrect = rawAnswer === '' ? true : (clicked.toLowerCase() === rawAnswer.toLowerCase());
+              }
+
+              if (!isCorrect) return null;
+
+              const activePlayer = playersState[currentPlayerIndex] || { name: quiz.teamName || 'Player 1' };
+              const playerPhoto = activePlayer.photo;
+              const playerName = activePlayer.name || 'Player';
+              const pointsGained = getAwardPoints();
+              const activeTopic = question?.category || quiz.topic || 'Quiz';
+
+              const badgeIcons = ['🌟', '🏆', '🥇', '🧠', '⚡', '🎯', '👑', '💎'];
+              const icon = badgeIcons[currentQuestionIndex % badgeIcons.length];
+
+              const badgeTitles = [
+                `${activeTopic} Master!`,
+                `Trivia Whiz!`,
+                `Sharp Shooter!`,
+                `Brainiac!`,
+                `Quick Thinker!`,
+                `Spot On!`,
+                `Super Star!`,
+                `Knowledge Champion!`
+              ];
+              const badgeTitle = badgeTitles[currentQuestionIndex % badgeTitles.length];
+
+              return (
+                <motion.div
+                  initial={{ scale: 0.4, opacity: 0, y: 40 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.5, opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                  className="fixed inset-0 z-[200] pointer-events-none flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
+                >
+                  <div className="bg-gradient-to-br from-amber-300 via-amber-400 to-orange-500 p-8 sm:p-10 rounded-[3rem] shadow-[0_25px_80px_rgba(245,158,11,0.7)] border-8 border-white flex flex-col items-center text-center gap-4 animate-bounce max-w-lg w-full">
+                    {playerPhoto ? (
+                      <div className="relative -mt-14">
+                        <img src={playerPhoto} alt={playerName} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-xl" />
+                        <span className="absolute -bottom-2 -right-2 text-4xl">{icon}</span>
+                      </div>
+                    ) : (
+                      <div className="text-8xl drop-shadow-2xl -mt-12 animate-pulse">{icon}</div>
+                    )}
+                    
+                    <div className="bg-white text-orange-600 px-6 py-2 rounded-full font-black text-2xl sm:text-3xl uppercase tracking-widest shadow-inner border-2 border-orange-200">
+                      🏆 {badgeTitle}
+                    </div>
+
+                    <div className="text-white font-extrabold text-3xl sm:text-4xl drop-shadow-md">
+                      {playerName} Earned a Badge!
+                    </div>
+
+                    <div className="bg-black/25 text-yellow-100 font-black text-xl sm:text-2xl px-6 py-2 rounded-full border border-white/30 flex items-center gap-2">
+                      <span>+{pointsGained} Points</span>
+                      <span className="text-white/60">|</span>
+                      <span className="text-white">{activeTopic}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })()}
           <motion.div
             key={`q-container-inner-${currentQuestionIndex}`}
             className={`${quiz.mode === 'interactive' ? 'w-[calc(100%-16rem)] sm:w-[calc(100%-18rem)] md:w-[calc(100%-22rem)] lg:w-[calc(100%-25rem)] ml-2 sm:ml-4 md:ml-8 mr-auto justify-center' : 'w-[90vw] mx-auto'} max-w-[1800px] h-full flex flex-col z-10 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' ? 'p-4 md:p-6' : 'p-8 md:p-12'}`}
@@ -1827,48 +1985,29 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   </div>
                 )}
                 {(quiz.isOfflineMode || !(question.type?.toLowerCase() === 'identify' || quiz.type?.toLowerCase() === 'identify' || quiz.type === 'identify-image' || quiz.topic?.toLowerCase().startsWith('identify'))) && (
-                  <h2 className={`font-extrabold text-slate-800 ${quiz.mode === 'interactive' ? 'text-left' : 'text-center'} leading-tight drop-shadow-sm flex-1 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' || quiz.type === 'jumbled-letters' || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'text-4xl md:text-5xl lg:text-6xl' : 'text-5xl md:text-6xl lg:text-7xl'}`}>
+                  <h2 className={`font-extrabold text-slate-800 ${quiz.mode === 'interactive' ? 'text-left' : 'text-center'} leading-tight drop-shadow-sm flex-1 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' || isJumbledLetters || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'text-4xl md:text-5xl lg:text-6xl' : 'text-5xl md:text-6xl lg:text-7xl'}`}>
                     {question.question || 'Unjumble the word!'}
                   </h2>
                 )}
               </div>
               
-              {quiz.type === 'jumbled-letters' && (
+              {isJumbledLetters && (
                 <div className={`flex flex-col ${quiz.mode === 'interactive' ? 'items-start text-left' : 'items-center'} gap-8 w-full mt-2`}>
-                  <div className={`flex flex-wrap gap-3 md:gap-4 ${quiz.mode === 'interactive' ? 'justify-start' : 'justify-center'}`}>
+                  <div className={`flex flex-wrap gap-2 sm:gap-3 md:gap-4 ${quiz.mode === 'interactive' ? 'justify-start' : 'justify-center'} w-full`}>
                     {(() => {
-                      const word = question.correctAnswer.replace(/\s/g, '').toUpperCase();
+                      const rawAnswer = question.correctAnswer || question.answer || question.word || question.correct_answer || question.brand_name || '';
+                      const word = rawAnswer.replace(/\s/g, '').toUpperCase();
                       const letterObjects = word.split('').map((char, i) => ({ char, id: i }));
-                      let displayLetters = [];
-                      if (stage === 'reveal') {
-                        displayLetters = letterObjects;
-                      } else {
-                        const jsonJumbled = (question.question || '').replace(/\s/g, '').toUpperCase();
-                        if (jsonJumbled.length === word.length && jsonJumbled.split('').sort().join('') === word.split('').sort().join('')) {
-                           let available = [...letterObjects];
-                           displayLetters = jsonJumbled.split('').map(char => {
-                              const matchIndex = available.findIndex(l => l.char === char);
-                              if (matchIndex !== -1) {
-                                 const match = available[matchIndex];
-                                 available.splice(matchIndex, 1);
-                                 return match;
-                              }
-                              return { char, id: Math.random() };
-                           });
-                        } else if (jumbledOrder.length > 0) {
-                           displayLetters = jumbledOrder.map(id => letterObjects.find(l => l.id === id)!).filter(Boolean);
-                        } else {
-                           displayLetters = letterObjects;
-                        }
-                      }
+                      const displayLetters = stage === 'reveal' ? letterObjects : jumbledLettersForQuestion;
+
                       return displayLetters.map((item, i) => (
                         <motion.div 
-                          key={item.id}
+                          key={`${item.id}-${i}`}
                           layout
                           initial={{ scale: 0 }}
                           animate={{ scale: 1 }}
-                          transition={{ delay: stage === 'reveal' ? 0 : i * 0.1, type: 'spring' }}
-                          className={`w-32 h-40 md:w-40 md:h-48 rounded-2xl shadow-[0_10px_20px_rgba(0,0,0,0.1)] flex items-center justify-center text-7xl md:text-[6rem] font-black border-b-[16px] uppercase z-10 ${stage === 'reveal' ? 'bg-emerald-500 text-white border-emerald-700 shadow-[0_0_40px_rgba(16,185,129,0.5)]' : 'bg-slate-100 text-indigo-600 border-indigo-200'}`}
+                          transition={{ delay: stage === 'reveal' ? 0 : i * 0.08, type: 'spring', stiffness: 300, damping: 20 }}
+                          className={`w-16 h-22 sm:w-20 sm:h-28 md:w-28 md:h-36 lg:w-32 lg:h-40 rounded-2xl shadow-[0_10px_20px_rgba(0,0,0,0.15)] flex items-center justify-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black border-b-[10px] md:border-b-[14px] uppercase z-10 transition-colors ${stage === 'reveal' ? 'bg-emerald-500 text-white border-emerald-700 shadow-[0_0_40px_rgba(16,185,129,0.5)]' : 'bg-slate-100 text-indigo-600 border-indigo-200'}`}
                         >
                           {item.char}
                         </motion.div>
@@ -1930,11 +2069,18 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                                 }
                                 return nextScore;
                               });
-                              if (quiz.isMultiplayer) {
+                              if (quiz.isMultiplayer || (quiz.players && quiz.players.length > 0)) {
                                 setPlayersState(prev => {
                                   const next = [...prev];
                                   if (next[currentPlayerIndex]) {
-                                    next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + (getAwardPoints()) };
+                                    const currentBadges = next[currentPlayerIndex].badges || [];
+                                    const badgeIcons = ['🌟', '🏆', '🥇', '🧠', '⚡', '🎯', '👑', '💎'];
+                                    const newBadge = badgeIcons[currentQuestionIndex % badgeIcons.length];
+                                    next[currentPlayerIndex] = { 
+                                      ...next[currentPlayerIndex], 
+                                      score: (next[currentPlayerIndex].score || 0) + (getAwardPoints()),
+                                      badges: [...currentBadges, newBadge]
+                                    };
                                   }
                                   return next;
                                 });
@@ -2020,11 +2166,18 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                               }
                               return nextScore;
                             });
-                              if (quiz.isMultiplayer) {
+                              if (quiz.isMultiplayer || (quiz.players && quiz.players.length > 0)) {
                                 setPlayersState(prev => {
                                   const next = [...prev];
                                   if (next[currentPlayerIndex]) {
-                                    next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + (getAwardPoints()) };
+                                    const currentBadges = next[currentPlayerIndex].badges || [];
+                                    const badgeIcons = ['🌟', '🏆', '🥇', '🧠', '⚡', '🎯', '👑', '💎'];
+                                    const newBadge = badgeIcons[currentQuestionIndex % badgeIcons.length];
+                                    next[currentPlayerIndex] = { 
+                                      ...next[currentPlayerIndex], 
+                                      score: (next[currentPlayerIndex].score || 0) + (getAwardPoints()),
+                                      badges: [...currentBadges, newBadge]
+                                    };
                                   }
                                   return next;
                                 });
@@ -2065,7 +2218,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
             
-            {quiz.type === '5-clues' && (
+            {(quiz.type === '5-clues' || question.type === '5-clues') && !isJumbledLetters && (
               <div className="flex-1 w-full shrink-0 mb-6 flex flex-col gap-2 md:gap-3">
                 {question.clues?.map((clue, i) => {
                   const isVisible = i <= clueIndex || stage === 'reveal';
@@ -2096,7 +2249,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
             
-            {quiz.type === 'jumbled-letters' && (
+            {isJumbledLetters && (
               <div className="flex-1 w-full shrink-0 mb-6 flex flex-col gap-2 md:gap-3">
                 {question.clues?.map((clue, i) => {
                   const isVisible = i <= clueIndex || stage === 'reveal';
@@ -2152,14 +2305,19 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                         : 'bg-emerald-500 border-emerald-700'
                     }`}
                   >
-                    {quiz.mode === 'interactive' && interactiveOptionClicked && interactiveOptionClicked.toLowerCase() !== question.correctAnswer.toLowerCase() ? (
-                      <>
-                        <span className="line-through opacity-70 text-2xl mr-4">{interactiveOptionClicked}</span>
-                        <span>Correct: {question.correctAnswer}</span>
-                      </>
-                    ) : (
-                      `Answer: ${question.correctAnswer}`
-                    )}
+                    {(() => {
+                      const rawAnswer = question.correctAnswer || question.answer || question.word || question.correct_answer || question.brand_name || '';
+                      const isWrong = quiz.mode === 'interactive' && interactiveOptionClicked && interactiveOptionClicked.toLowerCase() !== rawAnswer.toLowerCase();
+                      if (isWrong) {
+                        return (
+                          <>
+                            <span className="line-through opacity-70 text-2xl mr-4">{interactiveOptionClicked}</span>
+                            <span>Correct: {rawAnswer}</span>
+                          </>
+                        );
+                      }
+                      return `Answer: ${rawAnswer}`;
+                    })()}
                   </motion.div>
                 )}
               </div>
@@ -2215,7 +2373,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
 
-            {quiz.type === 'text-presentation' && (
+            {(quiz.type === 'text-presentation' || question.type === 'text-presentation') && !isJumbledLetters && (
               <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto mt-4 mb-4">
                 {question.clues?.map((clue, idx) => (
                   <AnimatePresence key={idx}>
@@ -2235,7 +2393,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
 
-            {quiz.type !== 'text-presentation' && quiz.type !== '5-clues' && quiz.type !== 'detective' && quiz.type !== 'jumbled-letters' && quiz.type !== 'match-the-following' && quiz.type !== 'word-search' && (
+            {!isJumbledLetters && quiz.type !== 'text-presentation' && quiz.type !== '5-clues' && quiz.type !== 'detective' && quiz.type !== 'jumbled-letters' && quiz.type !== 'match-the-following' && quiz.type !== 'word-search' && (
               <div className={`flex flex-col w-full ${quiz.mode === 'interactive' ? 'items-start text-left' : 'items-center'}`}>
                 <div className={`grid grid-cols-1 ${quiz.mode === 'interactive' ? 'lg:grid-cols-2' : 'md:grid-cols-2'} gap-6 w-full shrink-0 mb-6`}>
                   {question.options?.map((option, i) => {
@@ -2280,11 +2438,18 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                             setInteractiveOptionClicked(option);
                             if (isCorrect) {
                               setScore(s => s + (getAwardPoints()));
-                              if (quiz.isMultiplayer) {
+                              if (quiz.isMultiplayer || (quiz.players && quiz.players.length > 0)) {
                                 setPlayersState(prev => {
                                   const next = [...prev];
                                   if (next[currentPlayerIndex]) {
-                                    next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + (getAwardPoints()) };
+                                    const currentBadges = next[currentPlayerIndex].badges || [];
+                                    const badgeIcons = ['🌟', '🏆', '🥇', '🧠', '⚡', '🎯', '👑', '💎'];
+                                    const newBadge = badgeIcons[currentQuestionIndex % badgeIcons.length];
+                                    next[currentPlayerIndex] = { 
+                                      ...next[currentPlayerIndex], 
+                                      score: (next[currentPlayerIndex].score || 0) + (getAwardPoints()),
+                                      badges: [...currentBadges, newBadge]
+                                    };
                                   }
                                   return next;
                                 });

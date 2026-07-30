@@ -437,6 +437,8 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
         if (Array.isArray(json)) {
           const items = json.map(item => ({
             ...item,
+            correctAnswer: item.correctAnswer || item.answer || item.word || item.correct_answer || item.brand_name || '',
+            type: item.type || firstType || 'jumbled-letters',
             category: (files.length > 1) ? fileCategory : (item.category || fileCategory)
           }));
           combinedQuestions.push(...items);
@@ -451,6 +453,8 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
 
           const questionsWithCategory = json.questions.map((q: any) => ({
             ...q,
+            correctAnswer: q.correctAnswer || q.answer || q.word || q.correct_answer || q.brand_name || '',
+            type: q.type || json.type || firstType || 'jumbled-letters',
             category: (files.length > 1) ? fileCategory : (q.category || fileCategory)
           }));
           combinedQuestions.push(...questionsWithCategory);

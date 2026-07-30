@@ -40,12 +40,18 @@ export interface QuizQuestion {
   nominatimQuery?: string;
   parentRegionQuery?: string;
   pairs?: MatchPair[];
+  jumbledWord?: string;
+  jumbled?: string;
   combatLeft?: CombatQuestion;
   combatRight?: CombatQuestion;
   grid?: string[][];
   wordsToFind?: string[];
   wordLocations?: WordSearchLocation[];
   correctAnswer: string;
+  answer?: string;
+  word?: string;
+  correct_answer?: string;
+  brand_name?: string;
   timeLimit: number;
   imageUrl?: string;
   imagePreviewUrl?: string;
