@@ -58,8 +58,8 @@ class AudioSynth {
     if (!this.musicEnabled) return;
     try {
       const ctx = this.getCtx();
-      // A pleasant, realistic-sounding chime (major chord with rich harmonics)
-      const playBell = (freq, time, duration, vol) => {
+      // Subtle and pleasant chime
+      const playBell = (freq: number, time: number, duration: number, vol: number) => {
         const osc1 = ctx.createOscillator();
         const osc2 = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -67,11 +67,11 @@ class AudioSynth {
         osc1.type = 'sine';
         osc2.type = 'triangle';
         osc1.frequency.value = freq;
-        osc2.frequency.value = freq * 2; // Octave above for brightness
+        osc2.frequency.value = freq * 2;
         
         gain.gain.setValueAtTime(0, ctx.currentTime + time);
-        gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + time + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + time + duration);
+        gain.gain.linearRampToValueAtTime(vol * 0.5, ctx.currentTime + time + 0.02); // 50% softer
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time + duration);
         
         osc1.connect(gain);
         osc2.connect(gain);
@@ -83,11 +83,9 @@ class AudioSynth {
         osc2.stop(ctx.currentTime + time + duration);
       };
       
-      // Arpeggiate a C Major 7 chord rapidly
-      playBell(523.25, 0, 0.4, 0.2);     // C5
-      playBell(659.25, 0.05, 0.4, 0.15);  // E5
-      playBell(783.99, 0.10, 0.4, 0.1);   // G5
-      playBell(1046.50, 0.15, 0.8, 0.2);  // C6
+      playBell(523.25, 0, 0.3, 0.15);     
+      playBell(659.25, 0.08, 0.3, 0.1);  
+      playBell(1046.50, 0.16, 0.5, 0.15); 
     } catch (e) {
       console.warn("Audio play failed", e);
     }
@@ -97,23 +95,23 @@ class AudioSynth {
     if (!this.musicEnabled) return;
     try {
       const ctx = this.getCtx();
-      // Realistic buzzer sound (two detuned sawtooth waves with lowpass filter sweep)
-      const playBuzz = (freq, detune, duration, vol) => {
+      // Subtle muffled pop/thud
+      const playPop = (freq: number, duration: number, vol: number) => {
         const osc = ctx.createOscillator();
-        const filter = ctx.createBiquadFilter();
         const gain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
         
-        osc.type = 'sawtooth';
-        osc.frequency.value = freq;
-        osc.detune.value = detune;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(freq * 0.5, ctx.currentTime + duration);
         
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(2000, ctx.currentTime);
-        filter.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + duration);
+        filter.frequency.setValueAtTime(600, ctx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + duration);
         
         gain.gain.setValueAtTime(0, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+        gain.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
         
         osc.connect(filter);
         filter.connect(gain);
@@ -123,9 +121,8 @@ class AudioSynth {
         osc.stop(ctx.currentTime + duration);
       };
       
-      playBuzz(150, -10, 0.4, 0.15); // Low buzz
-      playBuzz(150, 10, 0.4, 0.15);  // Detuned for thickness
-      playBuzz(75, 0, 0.4, 0.1);   // Sub bass for impact
+      playPop(120, 0.25, 0.2); 
+      playPop(100, 0.3, 0.2); 
     } catch (e) {
       console.warn("Audio play failed", e);
     }
@@ -192,6 +189,48 @@ class AudioSynth {
     }
   }
   
+  playClap() {
+    if (!this.musicEnabled) return;
+    try {
+      const ctx = this.getCtx();
+      
+      const playSingleClap = (timeOff: number) => {
+        const duration = 0.15;
+        const bufferSize = ctx.sampleRate * duration;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1; // White noise
+        }
+        
+        const noiseSource = ctx.createBufferSource();
+        noiseSource.buffer = buffer;
+        
+        const bandpass = ctx.createBiquadFilter();
+        bandpass.type = 'bandpass';
+        bandpass.frequency.setValueAtTime(1200, ctx.currentTime + timeOff);
+        
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0, ctx.currentTime + timeOff);
+        noiseGain.gain.exponentialRampToValueAtTime(0.8, ctx.currentTime + timeOff + 0.01);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + timeOff + duration);
+        
+        noiseSource.connect(bandpass);
+        bandpass.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        
+        noiseSource.start(ctx.currentTime + timeOff);
+      };
+
+      // Create a few random claps to simulate a short applause or scattered clapping
+      for (let i = 0; i < 5; i++) {
+        playSingleClap(Math.random() * 0.3);
+      }
+    } catch (e) {
+      console.warn("Audio play failed", e);
+    }
+  }
+
   playVictory() {
     this.playCheer();
   }

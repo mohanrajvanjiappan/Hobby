@@ -83,6 +83,7 @@ export interface Quiz {
   frameSize?: 'small' | 'medium' | 'large';
   showFrames?: boolean;
   showBadges?: boolean;
+  enableClapping?: boolean;
   isMultipleFilesLoaded?: boolean;
   players?: PlayerDetails[];
   title: string;

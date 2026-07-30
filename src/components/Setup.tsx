@@ -37,6 +37,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
   const [frameSize, setFrameSize] = useState<'small' | 'medium' | 'large'>('large');
   const [showFrames, setShowFrames] = useState<boolean>(true);
   const [showBadges, setShowBadges] = useState<boolean>(true);
+  const [enableClapping, setEnableClapping] = useState<boolean>(true);
   const [setupMode, setSetupMode] = useState<'quiz' | 'presentation'>('quiz');
   const [presentationContent, setPresentationContent] = useState('');
   const [presentationDuration, setPresentationDuration] = useState(5);
@@ -213,7 +214,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
     audioSynth.setMusicPreference(musicEnabled);
     
     if (cachedQuiz && quizType === 'identify-image') {
-      const q = { ...cachedQuiz, mode, showBadges };
+      const q = { ...cachedQuiz, mode, showBadges, enableClapping };
       if (mode === 'interactive') {
         setPendingInteractiveQuiz(q);
       } else {
@@ -246,6 +247,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
       
       data.mode = mode;
       data.showBadges = showBadges;
+      data.enableClapping = enableClapping;
       
       if (quizType === 'identify-image' && identifyMode === 'custom') {
         data.questions = data.questions.map((q: any) => {
@@ -1012,6 +1014,36 @@ return (
               onChange={(e) => setShowBadges(e.target.checked)}
               onClick={(e) => e.stopPropagation()}
               className="w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500 cursor-pointer accent-amber-600"
+            />
+          </div>
+
+          {/* Clapping Toggle */}
+          <div 
+            onClick={() => setEnableClapping(!enableClapping)}
+            className="p-3.5 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border-2 border-emerald-200/80 rounded-xl flex items-center justify-between cursor-pointer hover:border-emerald-300 transition-all shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-black text-lg shadow-md shadow-emerald-500/20">
+                👏
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  Clapping & Cheer
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-200/80 text-emerald-900 border border-emerald-300/50">
+                    Interactive Mode
+                  </span>
+                </div>
+                <div className="text-xs font-medium text-slate-600">
+                  Play clapping sound for correct answers
+                </div>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={enableClapping}
+              onChange={(e) => setEnableClapping(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-5 h-5 text-emerald-600 border-emerald-300 rounded focus:ring-emerald-500 cursor-pointer accent-emerald-600"
             />
           </div>
           

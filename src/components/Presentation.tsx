@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Quiz } from '../types';
 import { audioSynth } from '../lib/audio';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson } from 'lucide-react';
+import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson } from 'lucide-react';
 import quizLogo from '../assets/images/quiz_logo_1783447286811.jpg';
 import MapQuestion from './MapQuestion';
 
@@ -12,7 +12,7 @@ interface PresentationProps {
   onExit: () => void;
 }
 
-type Stage = 'intro' | 'multiplayer-intro' | 'warmup' | 'countdown' | 'category-selection' | 'question-selection' | 'question' | 'reveal' | 'quote' | 'score' | 'badges' | 'talk' | 'outro' | 'video-badges';
+type Stage = 'intro' | 'multiplayer-intro' | 'warmup' | 'countdown' | 'category-selection' | 'question-selection' | 'question' | 'reveal' | 'quote' | 'score' | 'badges' | 'talk' | 'celebrate' | 'outro' | 'video-badges';
 
 const OUTRO_MESSAGES = [
   {
@@ -231,6 +231,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [clueIndex, setClueIndex] = useState(0);
+  const [celebratingIndex, setCelebratingIndex] = useState(0);
   const [shuffledRights, setShuffledRights] = useState<string[]>([]);
   const [jumbledOrder, setJumbledOrder] = useState<number[]>([]);
   const [imageError, setImageError] = useState(false);
@@ -240,6 +241,9 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   const [earnedBadges, setEarnedBadges] = useState<{player: string, name: string, icon: string, description: string}[]>([]);
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
   const [interactiveOptionClicked, setInteractiveOptionClicked] = useState<string | null>(null);
+  const [usedFiftyFifty, setUsedFiftyFifty] = useState<Record<string, boolean>>({});
+  const [eliminatedOptions, setEliminatedOptions] = useState<number[]>([]);
+  const [jumbledInput, setJumbledInput] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const categories = useMemo(() => Array.from(new Set(quiz.questions.map(q => q.category).filter(Boolean))) as string[], [quiz.questions]);
   const isMultipleFiles = useMemo(() => Boolean(
@@ -295,12 +299,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       `${activePlayer} is dominating the ${contextTopic} section!`
     ];
 
-    const variantSeed = (numAnswered * 7 + (currentPlayerIndex || 0) * 3 + contextTopic.length) % titleOptions.length;
+    const titleOptionIndex = (safeBadgeIndex + (currentPlayerIndex || 0)) % titleOptions.length;
+    const descOptionIndex = (safeBadgeIndex + (currentPlayerIndex || 0) + 1) % descOptions.length;
 
     return {
-      title: titleOptions[variantSeed],
+      title: titleOptions[titleOptionIndex],
       icon: meta.icon,
-      description: descOptions[variantSeed],
+      description: descOptions[descOptionIndex],
       color: meta.color,
       text: meta.text,
       player: activePlayer,
@@ -403,6 +408,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   useEffect(() => {
     setImageError(false);
     setInteractiveOptionClicked(null);
+    setEliminatedOptions([]);
+    setJumbledInput("");
   }, [currentQuestionIndex]);
 
   useEffect(() => {
@@ -538,7 +545,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   setStage('question');
                 } else {
                   if (quiz.mode === 'interactive' && quiz.participantTopic) setStage('talk');
-                  else setStage('outro');
+                  else setStage('celebrate');
                 }
                 return 0;
               }
@@ -562,7 +569,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   setStage('question');
                 } else {
                   if (quiz.mode === 'interactive' && quiz.participantTopic) setStage('talk');
-                  else setStage('outro');
+                  else setStage('celebrate');
                 }
                 return 0;
               }
@@ -777,7 +784,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             } else if (quiz.quotes && quiz.quotes.length > 0) {
               setStage('quote');
             } else {
-              setStage('outro');
+              setStage('celebrate');
             }
           } else {
             const totalQ = quiz.questions.length || 1;
@@ -832,7 +839,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       audioSynth.speak(`Quote for the day. ${quote.text}${authorText}`, () => {
         t = setTimeout(() => {
           audioSynth.playSwoosh();
-          setStage('outro');
+          setStage('celebrate');
         }, 2000);
       });
       
@@ -938,7 +945,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       const generatedBadges = [];
       
       const activeContextTopic = getActiveContextTopic();
-      const scorePerQuestion = quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1;
+      const scorePerQuestion = (quiz.mode === 'interactive' && quiz.type === '5-clues') ? 10 : (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1);
       
       const usedBadges = new Set();
       
@@ -1026,11 +1033,36 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       audioSynth.speak(`Now, let's hear from ${quiz.teamName || 'Player 1'} about ${quiz.participantTopic}`, () => {
         // Wait 120 seconds, then outro
         t = setTimeout(() => {
-          setStage('outro');
+          setStage('celebrate');
         }, 120000);
       });
       return () => {
         if (t) clearTimeout(t);
+        window.speechSynthesis.cancel();
+      };
+    }
+
+    if (stage === 'celebrate') {
+      let clapInterval: NodeJS.Timeout;
+      let timeoutId: NodeJS.Timeout;
+      
+      if (quiz.mode !== 'interactive' || celebratingIndex >= playersState.length) {
+        setStage('outro');
+      } else {
+        audioSynth.playCheer();
+        clapInterval = setInterval(() => {
+          audioSynth.playClap();
+        }, 4000); 
+        audioSynth.speak(`Let's celebrate ${playersState[celebratingIndex]?.name}! What an amazing performance. You earned these wonderful prizes!`);
+        
+        timeoutId = setTimeout(() => {
+          setCelebratingIndex(prev => prev + 1);
+        }, 60000); // 1 minute per player
+      }
+      
+      return () => {
+        if (clapInterval) clearInterval(clapInterval);
+        if (timeoutId) clearTimeout(timeoutId);
         window.speechSynthesis.cancel();
       };
     }
@@ -1042,10 +1074,76 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         audioSynth.speak(outroMessage.speech);
       }
     }
-  }, [stage, currentQuestionIndex, quiz, question]);
+  }, [stage, currentQuestionIndex, quiz, question, celebratingIndex]);
 
   const optionLetters = ['A', 'B', 'C', 'D'];
+
+  const handleFiftyFifty = () => {
+    if (!question || !question.options) return;
+    
+    const categoryKey = question.category || 'default';
+    const fiftyKey = `${currentPlayerIndex}-${categoryKey}`;
+    
+    if (usedFiftyFifty[fiftyKey]) return;
+    
+    const incorrectIndices: number[] = [];
+    question.options.forEach((opt, idx) => {
+      if (opt !== question.correctAnswer) {
+        incorrectIndices.push(idx);
+      }
+    });
+    
+    // Shuffle and pick half
+    incorrectIndices.sort(() => Math.random() - 0.5);
+    const toEliminate = incorrectIndices.slice(0, Math.max(1, incorrectIndices.length - 1));
+    
+    setEliminatedOptions(toEliminate);
+    setUsedFiftyFifty(prev => ({ ...prev, [fiftyKey]: true }));
+    audioSynth.playSwoosh();
+  };
+
+  const getAwardPoints = () => {
+    let inc = (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1);
+    if (quiz.mode === 'interactive' && quiz.type === '5-clues') {
+      inc = 10;
+      if (clueIndex === 2) inc = 9;
+      else if (clueIndex === 3) inc = 8;
+      else if (clueIndex >= 4) inc = 7;
+    }
+    return inc;
+  };
+
   const isInteractiveTimeout = quiz.mode === 'interactive' && stage === 'reveal' && interactiveOptionClicked === null;
+
+  const handleJumbledSubmit = () => {
+    if (stage === 'reveal' || !jumbledInput.trim()) return;
+    if (timerRef.current) clearInterval(timerRef.current);
+    const isCorrect = jumbledInput.trim().toLowerCase() === question.correctAnswer.toLowerCase();
+    
+    setInteractiveOptionClicked(isCorrect ? question.correctAnswer : jumbledInput);
+    
+    if (isCorrect) {
+      setScore(s => s + getAwardPoints());
+      if (quiz.isMultiplayer) {
+        setPlayersState(prev => {
+          const next = [...prev];
+          if (next[currentPlayerIndex]) {
+            next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + getAwardPoints() };
+          }
+          return next;
+        });
+      }
+      audioSynth.playCorrect();
+      if (quiz.enableClapping !== false && Math.random() < 0.4) {
+        setTimeout(() => audioSynth.playClap(), 300);
+      }
+    } else {
+      audioSynth.playWrong();
+    }
+    window.speechSynthesis.cancel();
+    setStage('reveal');
+  };
+
 
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white selection:bg-white/30">
@@ -1537,6 +1635,16 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   <span className="animate-pulse">👉 {playersState[currentPlayerIndex]?.name}'s Turn</span>
                 </div>
               )}
+              {quiz.mode === 'interactive' && question.options && question.options.length > 2 && (stage === 'question' || stage === 'reveal') && (
+                <button
+                  onClick={handleFiftyFifty}
+                  disabled={stage === 'reveal' || usedFiftyFifty[`${currentPlayerIndex}-${question.category || 'default'}`]}
+                  className={`px-6 py-3 rounded-full font-black text-xl uppercase tracking-widest flex items-center gap-2 border-4 transition-all shadow-2xl ${usedFiftyFifty[`${currentPlayerIndex}-${question.category || 'default'}`] ? 'bg-slate-300 text-slate-500 border-slate-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-400 text-white border-amber-600 active:scale-95'}`}
+                  title={usedFiftyFifty[`${currentPlayerIndex}-${question.category || 'default'}`] ? "50/50 already used in this category" : "Use 50/50 Lifeline"}
+                >
+                  <Lightbulb className="w-6 h-6" /> 50/50
+                </button>
+              )}
               <div className="bg-indigo-700 text-white px-8 py-3 rounded-full shadow-2xl font-black text-2xl tracking-widest uppercase flex items-center gap-3 border-4 border-indigo-400">
                 <Star className="w-6 h-6 text-yellow-300 fill-current" />
                 <span>
@@ -1682,8 +1790,11 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   {question.options.map((option, i) => {
                     const isCorrect = option === question.correctAnswer;
                     const isReveal = stage === 'reveal';
+                    const isEliminated = eliminatedOptions.includes(i);
                     let optClass = "bg-slate-100 text-slate-700 border-2 border-slate-200";
-                    if (quiz.mode === 'interactive' && !isReveal) {
+                    if (isEliminated && !isReveal) {
+                      optClass = "bg-slate-100 text-slate-400 border-2 border-slate-200 opacity-40 pointer-events-none";
+                    } else if (quiz.mode === 'interactive' && !isReveal) {
                       optClass += " cursor-pointer hover:bg-white active:scale-95";
                     } else if (isReveal) {
                       if (quiz.mode === 'interactive' && interactiveOptionClicked) {
@@ -1706,12 +1817,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                     return (
                       <div key={i} 
                         onClick={() => {
+                          if (isEliminated) return;
                           if (quiz.mode === 'interactive' && !isReveal) {
                             if (timerRef.current) clearInterval(timerRef.current);
                             setInteractiveOptionClicked(option);
                             if (isCorrect) {
                               setScore(s => {
-                                const inc = (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1);
+                                const inc = (getAwardPoints());
                                 const nextScore = s + inc;
                                 const threshold = Math.ceil(quiz.questions.length / 2) * inc;
                                 if (s < threshold && nextScore >= threshold) {
@@ -1723,12 +1835,15 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                                 setPlayersState(prev => {
                                   const next = [...prev];
                                   if (next[currentPlayerIndex]) {
-                                    next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1) };
+                                    next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + (getAwardPoints()) };
                                   }
                                   return next;
                                 });
                               }
                               audioSynth.playCorrect();
+                              if (quiz.mode === 'interactive' && quiz.enableClapping !== false && Math.random() < 0.4) {
+                                setTimeout(() => audioSynth.playClap(), 300);
+                              }
                             } else {
                               audioSynth.playWrong();
                             }
@@ -1798,7 +1913,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                           setInteractiveOptionClicked(sentence);
                           if (isFake) {
                             setScore(s => {
-                              const inc = (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1);
+                              const inc = (getAwardPoints());
                               const nextScore = s + inc;
                               const threshold = Math.ceil(quiz.questions.length / 2) * inc;
                               if (s < threshold && nextScore >= threshold) {
@@ -1810,12 +1925,15 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                                 setPlayersState(prev => {
                                   const next = [...prev];
                                   if (next[currentPlayerIndex]) {
-                                    next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1) };
+                                    next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + (getAwardPoints()) };
                                   }
                                   return next;
                                 });
                               }
                             audioSynth.playCorrect();
+                            if (quiz.mode === 'interactive' && quiz.enableClapping !== false && Math.random() < 0.4) {
+                              setTimeout(() => audioSynth.playClap(), 300);
+                            }
                           } else {
                             audioSynth.playWrong();
                           }
@@ -1898,13 +2016,51 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                     </motion.div>
                   );
                 })}
+                {quiz.mode === 'interactive' && stage !== 'reveal' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-6 flex flex-col md:flex-row gap-4 items-stretch justify-center w-full max-w-3xl mx-auto"
+                  >
+                    <input
+                      type="text"
+                      value={jumbledInput}
+                      onChange={(e) => setJumbledInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleJumbledSubmit();
+                        }
+                      }}
+                      className="flex-1 px-8 py-5 rounded-full text-3xl md:text-4xl font-bold text-center text-slate-800 border-4 border-indigo-200 focus:border-indigo-500 focus:outline-none shadow-inner"
+                      placeholder="Type answer here..."
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleJumbledSubmit}
+                      className="px-10 py-5 rounded-full bg-emerald-500 text-white font-black text-3xl md:text-4xl shadow-[0_10px_0_rgba(16,185,129,1)] hover:translate-y-2 hover:shadow-none transition-all"
+                    >
+                      SUBMIT
+                    </button>
+                  </motion.div>
+                )}
                 {stage === 'reveal' && (
                   <motion.div
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="mt-2 px-6 py-4 rounded-3xl bg-emerald-500 text-white border-b-8 border-emerald-700 shadow-[0_0_50px_rgba(16,185,129,0.8)] text-3xl md:text-4xl font-black text-center uppercase tracking-widest"
+                    className={`mt-2 px-6 py-4 rounded-3xl text-white border-b-8 shadow-[0_0_50px_rgba(16,185,129,0.8)] text-3xl md:text-4xl font-black text-center uppercase tracking-widest ${
+                      quiz.mode === 'interactive' && interactiveOptionClicked && interactiveOptionClicked.toLowerCase() !== question.correctAnswer.toLowerCase()
+                        ? 'bg-rose-500 border-rose-700 shadow-[0_0_50px_rgba(244,63,94,0.8)]'
+                        : 'bg-emerald-500 border-emerald-700'
+                    }`}
                   >
-                    Answer: {question.correctAnswer}
+                    {quiz.mode === 'interactive' && interactiveOptionClicked && interactiveOptionClicked.toLowerCase() !== question.correctAnswer.toLowerCase() ? (
+                      <>
+                        <span className="line-through opacity-70 text-2xl mr-4">{interactiveOptionClicked}</span>
+                        <span>Correct: {question.correctAnswer}</span>
+                      </>
+                    ) : (
+                      `Answer: ${question.correctAnswer}`
+                    )}
                   </motion.div>
                 )}
               </div>
@@ -1986,9 +2142,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   {question.options?.map((option, i) => {
                     const isCorrect = option === question.correctAnswer;
                     const isReveal = stage === 'reveal';
+                    const isEliminated = eliminatedOptions.includes(i);
                     
                     let cardClass = "bg-white text-slate-800 border-b-8 border-slate-300";
-                    if (quiz.mode === 'interactive' && !isReveal) {
+                    if (isEliminated && !isReveal) {
+                      cardClass = "bg-slate-100 text-slate-400 border-b-8 border-slate-200 opacity-40 pointer-events-none";
+                    } else if (quiz.mode === 'interactive' && !isReveal) {
                       cardClass += " cursor-pointer hover:bg-slate-50 active:scale-95";
                     } else if (isReveal) {
                       if (quiz.mode === 'interactive' && interactiveOptionClicked) {
@@ -2016,21 +2175,25 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       <motion.div
                         key={i}
                         onClick={() => {
+                          if (isEliminated) return;
                           if (quiz.mode === 'interactive' && !isReveal) {
                             if (timerRef.current) clearInterval(timerRef.current);
                             setInteractiveOptionClicked(option);
                             if (isCorrect) {
-                              setScore(s => s + (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1));
+                              setScore(s => s + (getAwardPoints()));
                               if (quiz.isMultiplayer) {
                                 setPlayersState(prev => {
                                   const next = [...prev];
                                   if (next[currentPlayerIndex]) {
-                                    next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1) };
+                                    next[currentPlayerIndex] = { ...next[currentPlayerIndex], score: next[currentPlayerIndex].score + (getAwardPoints()) };
                                   }
                                   return next;
                                 });
                               }
                               audioSynth.playCorrect();
+                              if (quiz.mode === 'interactive' && quiz.enableClapping !== false && Math.random() < 0.4) {
+                                setTimeout(() => audioSynth.playClap(), 300);
+                              }
                             } else {
                               audioSynth.playWrong();
                             }
@@ -2073,7 +2236,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                           {quiz.topic} Master!
                         </span>
                         <span className="text-white font-bold text-2xl drop-shadow-md bg-black/20 px-4 py-1 rounded-full">
-                          +{quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1} {playersState[currentPlayerIndex]?.name}
+                          +{getAwardPoints()} {playersState[currentPlayerIndex]?.name}
                         </span>
                       </div>
                     </motion.div>
@@ -2301,7 +2464,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                     if (quiz.participantTopic && quiz.participantTopic.trim()) {
                       setStage('talk');
                     } else {
-                      setStage('outro');
+                      setStage('celebrate');
                     }
                   }}
                   className="px-10 py-5 bg-yellow-400 text-yellow-900 rounded-full font-black text-2xl shadow-[0_10px_0_rgba(202,138,4,1)] hover:translate-y-2 hover:shadow-none transition-all"
@@ -2335,12 +2498,118 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 <Clock className="w-8 h-8 animate-pulse" /> You have 2 minutes to talk!
               </p>
               <button
-                  onClick={() => setStage('outro')}
+                  onClick={() => setStage('celebrate')}
                   className="mt-8 px-6 py-3 bg-white/20 text-white rounded-full font-bold text-lg hover:bg-white/30 transition-all border border-white/50"
                 >
                   Skip Timer
                 </button>
             </div>
+          </motion.div>
+        )}
+
+        {stage === 'celebrate' && quiz.mode === 'interactive' && (
+          <motion.div
+            key="celebrate"
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 1.5, opacity: 0 }}
+            className="text-center p-6 md:p-12 max-w-7xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full relative overflow-hidden"
+          >
+            {playersState[celebratingIndex] && (
+              <>
+                <motion.div 
+                  initial={{ y: -50, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ type: 'spring', delay: 0.2 }}
+                  className="mb-8 z-20"
+                >
+                  <h2 className="text-5xl md:text-7xl font-black text-white mb-4 uppercase tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]">
+                    Congratulations!
+                  </h2>
+                  <h3 className="text-4xl md:text-6xl font-bold text-yellow-300 drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
+                    {playersState[celebratingIndex].name}
+                  </h3>
+                  <p className="text-2xl font-bold mt-4 bg-black/30 px-6 py-2 rounded-full inline-block border border-white/20 shadow-lg text-white">
+                    Score: {playersState[celebratingIndex].score}
+                  </p>
+                </motion.div>
+
+                {/* Animated Prizes Section */}
+                <div className="flex flex-wrap justify-center gap-8 md:gap-16 items-center my-8 z-20">
+                  <motion.div
+                    animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.2, 1] }}
+                    transition={{ repeat: Infinity, duration: 2 }}
+                    className="flex flex-col items-center gap-4"
+                  >
+                    <div className="w-32 h-32 md:w-48 md:h-48 bg-gradient-to-tr from-yellow-400 to-amber-600 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(251,191,36,0.6)] border-4 border-white/50">
+                      <Trophy className="w-16 h-16 md:w-24 md:h-24 text-white drop-shadow-lg" />
+                    </div>
+                    <span className="text-xl md:text-2xl font-black text-white uppercase tracking-wider bg-black/40 px-6 py-2 rounded-full border border-white/20 shadow-lg">Champion Cup</span>
+                  </motion.div>
+
+                  <motion.div
+                    animate={{ y: [0, -20, 0], scale: [1, 1.1, 1] }}
+                    transition={{ repeat: Infinity, duration: 2.5, delay: 0.5 }}
+                    className="flex flex-col items-center gap-4"
+                  >
+                    <div className="w-32 h-32 md:w-48 md:h-48 bg-gradient-to-tr from-emerald-400 to-teal-600 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(52,211,153,0.6)] border-4 border-white/50">
+                      <Award className="w-16 h-16 md:w-24 md:h-24 text-white drop-shadow-lg" />
+                    </div>
+                    <span className="text-xl md:text-2xl font-black text-white uppercase tracking-wider bg-black/40 px-6 py-2 rounded-full border border-white/20 shadow-lg">Master Medal</span>
+                  </motion.div>
+
+                  <motion.div
+                    animate={{ rotate: [0, -15, 15, 0], scale: [1, 1.15, 1] }}
+                    transition={{ repeat: Infinity, duration: 2.2, delay: 1 }}
+                    className="flex flex-col items-center gap-4"
+                  >
+                    <div className="w-32 h-32 md:w-48 md:h-48 bg-gradient-to-tr from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(192,38,211,0.6)] border-4 border-white/50">
+                      <Gift className="w-16 h-16 md:w-24 md:h-24 text-white drop-shadow-lg" />
+                    </div>
+                    <span className="text-xl md:text-2xl font-black text-white uppercase tracking-wider bg-black/40 px-6 py-2 rounded-full border border-white/20 shadow-lg">Mystery Box</span>
+                  </motion.div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    const nextIdx = celebratingIndex + 1;
+                    if (nextIdx >= playersState.length) {
+                      setStage('outro');
+                    } else {
+                      setCelebratingIndex(nextIdx);
+                    }
+                  }}
+                  className="mt-6 z-30 px-8 py-3 bg-white text-indigo-700 hover:bg-indigo-50 rounded-full font-bold text-lg shadow-xl transition-all"
+                >
+                  {celebratingIndex < playersState.length - 1 ? 'Next Player' : 'Finish Celebration'}
+                </button>
+
+                {/* Confetti & Sparkles */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
+                   {Array.from({ length: 30 }).map((_, i) => (
+                     <motion.div
+                       key={`confetti-${celebratingIndex}-${i}`}
+                       initial={{ y: -100, x: (Math.random() - 0.5) * 1500, opacity: 0, rotate: 0 }}
+                       animate={{ 
+                         y: 1000, 
+                         x: (Math.random() - 0.5) * 1500,
+                         opacity: [0, 1, 1, 0],
+                         rotate: 360
+                       }}
+                       transition={{ 
+                         duration: 3 + Math.random() * 4, 
+                         repeat: Infinity,
+                         delay: Math.random() * 2 
+                       }}
+                       className="absolute top-0 text-yellow-300"
+                       style={{ left: '50%' }}
+                     >
+                       <Star className={`w-8 h-8 md:w-12 md:h-12 ${i % 2 === 0 ? 'fill-yellow-300 text-yellow-300' : 'fill-pink-400 text-pink-400'}`} />
+                     </motion.div>
+                   ))}
+                </div>
+              </>
+            )}
           </motion.div>
         )}
 

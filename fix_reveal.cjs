@@ -1,44 +1,37 @@
 const fs = require('fs');
-let content = fs.readFileSync('src/components/Presentation.tsx', 'utf8');
+let content = fs.readFileSync('src/components/Presentation.tsx', 'utf-8');
 
-const startIdx = content.indexOf('const onSpeakEnd = () => {');
-const endIdx = content.indexOf('}, 2000);', startIdx);
-if (startIdx !== -1 && endIdx !== -1) {
-  const replacement = `const onSpeakEnd = () => {
-        t = setTimeout(() => {
-          audioSynth.playSwoosh();
-          // Go to next question, or quote if it's the end
-          if (quiz.isMultiplayer && quiz.mode !== 'interactive') {
-            setAnsweredQuestions(prev => {
-              const next = new Set(prev);
-              next.add(currentQuestionIndex);
-              
-              if (next.size >= quiz.questions.length) {
-                setStage('score');
-              } else {
-                setCurrentPlayerIndex(p => (p + 1) % playersState.length);
-                setStage('question-selection');
-              }
-              return next;
-            });
-          } else {
-            if (quiz.isMultiplayer && quiz.mode === 'interactive') {
-              setCurrentPlayerIndex(p => (p + 1) % playersState.length);
-            }
-            if (currentQuestionIndex < quiz.questions.length - 1) {
-              setCurrentQuestionIndex((prev) => prev + 1);
-              setStage('question');
-            } else if (quiz.quotes && quiz.quotes.length > 0 && quiz.mode !== 'interactive') {
-              setStage('quote');
-            } else {
-              if (quiz.mode === 'interactive') {
-                 setStage('score');
-              } else {
-                 setStage('outro');
-              }
-            }
-          }
-        `;
-  content = content.substring(0, startIdx) + replacement + content.substring(endIdx);
-  fs.writeFileSync('src/components/Presentation.tsx', content);
-}
+const search = `                {stage === 'reveal' && (
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="mt-2 px-6 py-4 rounded-3xl bg-emerald-500 text-white border-b-8 border-emerald-700 shadow-[0_0_50px_rgba(16,185,129,0.8)] text-3xl md:text-4xl font-black text-center uppercase tracking-widest"
+                  >
+                    Answer: {question.correctAnswer}
+                  </motion.div>
+                )}`;
+
+const replace = `                {stage === 'reveal' && (
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className={\`mt-2 px-6 py-4 rounded-3xl text-white border-b-8 shadow-[0_0_50px_rgba(16,185,129,0.8)] text-3xl md:text-4xl font-black text-center uppercase tracking-widest \${
+                      quiz.mode === 'interactive' && interactiveOptionClicked && interactiveOptionClicked.toLowerCase() !== question.correctAnswer.toLowerCase()
+                        ? 'bg-rose-500 border-rose-700 shadow-[0_0_50px_rgba(244,63,94,0.8)]'
+                        : 'bg-emerald-500 border-emerald-700'
+                    }\`}
+                  >
+                    {quiz.mode === 'interactive' && interactiveOptionClicked && interactiveOptionClicked.toLowerCase() !== question.correctAnswer.toLowerCase() ? (
+                      <>
+                        <span className="line-through opacity-70 text-2xl mr-4">{interactiveOptionClicked}</span>
+                        <span>Correct: {question.correctAnswer}</span>
+                      </>
+                    ) : (
+                      \`Answer: \${question.correctAnswer}\`
+                    )}
+                  </motion.div>
+                )}`;
+
+content = content.replace(search, replace);
+
+fs.writeFileSync('src/components/Presentation.tsx', content);
