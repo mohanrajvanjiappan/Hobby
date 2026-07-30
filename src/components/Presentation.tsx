@@ -250,7 +250,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
     quiz.isMultipleFilesLoaded ||
     categories.length > 1 ||
     quiz.topic === "Multiple JSON Files" ||
-    (quiz.title && quiz.title.includes("Files Loaded"))
+    (false)
   ), [quiz.isMultipleFilesLoaded, categories.length, quiz.topic, quiz.title]);
 
   const getActiveContextTopic = useCallback((qIndex?: number) => {
@@ -259,7 +259,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
     if (selectedCategory && selectedCategory.trim()) return selectedCategory.trim();
     if (currentQCategory && currentQCategory.trim()) return currentQCategory.trim();
     if (quiz.topic && quiz.topic !== "Multiple JSON Files" && quiz.topic.trim()) return quiz.topic.trim();
-    if (quiz.title && !quiz.title.includes("Files Loaded") && quiz.title.trim()) return quiz.title.trim();
+    if (quiz.title && quiz.title.trim()) return quiz.title.trim();
     return "Quiz Challenge";
   }, [currentQuestionIndex, quiz.questions, selectedCategory, quiz.topic, quiz.title]);
 
@@ -455,32 +455,36 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       // 1. Initial 2s silence
       const t1 = setTimeout(() => {
         // 2. Play intro music
-        audioSynth.playIntroMusic();
+        if (quiz.mode !== 'interactive') {
+          audioSynth.playIntroMusic();
+        }
         
         // wait for music to finish (approx 1.5s)
         const t2 = setTimeout(() => {
           // 3. Speak welcome note
-          const playerNames = playersState.map(p => p.name).join(' and ') || 'the players';
-
-          let introSpeech = `Welcome back to Quiz Time Brain Boosters. Today we are exploring ${quiz.title || quiz.topic}.`;
+          const names = playersState.map(p => p.name);
+          const playerNames = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0] || 'the players';
+          let introSpeech = `Welcome back to Quiz Time Brain Boosters. Today we are exploring ${getActiveContextTopic(0)}.`;
           if (quiz.mode === 'interactive' && isMultipleFiles) {
             introSpeech = `Welcome back to Quiz Time Brain Boosters. It's Challenge between ${playerNames}.`;
+          } else if (quiz.mode === 'interactive' && quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
+            introSpeech = `Welcome ${playerNames}! Today we are exploring ${getActiveContextTopic(0)}.`;
           } else if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
-            introSpeech = `Welcome back to Quiz Time Brain Boosters. Today's battle is between ${playerNames}. The topic is ${quiz.title || quiz.topic}.`;
+            introSpeech = `Welcome back to Quiz Time Brain Boosters. Today's battle is between ${playerNames}. The topic is ${getActiveContextTopic(0)}.`;
           } else if (quiz.teamName && quiz.mode === 'interactive') {
-            introSpeech = `Welcome back to Quiz Time Brain Boosters, ${quiz.teamName}. Today we are exploring ${quiz.title || quiz.topic}.`;
+            introSpeech = `Welcome ${quiz.teamName}. Today we are exploring ${getActiveContextTopic(0)}.`;
           }
 
           if (quiz.type === 'combat-mode') {
-            introSpeech = `Welcome back to Combat Mode! Today's topic is ${quiz.title || quiz.topic}. Pair up with a friend. Look at your side of the screen and answer before the time runs out!`;
+            introSpeech = `Welcome back to Combat Mode! Today's topic is ${getActiveContextTopic(0)}. Pair up with a friend. Look at your side of the screen and answer before the time runs out!`;
           } else if (quiz.type === 'word-search') {
-            introSpeech = `Welcome back to Word Search! Today's topic is ${quiz.title || quiz.topic}. Find the 5 hidden words in the grid. You have 30 seconds. Look left-to-right, and top-to-bottom only!`;
+            introSpeech = `Welcome back to Word Search! Today's topic is ${getActiveContextTopic(0)}. Find the 5 hidden words in the grid. You have 30 seconds. Look left-to-right, and top-to-bottom only!`;
           }
           
-          audioSynth.speak(introSpeech, () => {
-            // 4. Wait 2 seconds after speech finishes
+          const goToNext = () => {
+            const waitTime = 2000;
             const t3 = setTimeout(() => {
-              audioSynth.playSwoosh();
+              if (quiz.mode !== 'interactive') audioSynth.playSwoosh();
               if (quiz.isMultiplayer) {
                 setStage('multiplayer-intro');
               } else if (quiz.mode === 'interactive') {
@@ -488,9 +492,20 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               } else {
                 setStage('question');
               }
-            }, 2000);
+            }, waitTime);
             timeouts.push(t3);
-          });
+          };
+
+          audioSynth.speak(introSpeech, goToNext);
+          
+          // Safety fallback: if speech API is blocked or fails to fire onend
+          const safetyWait = Math.max(8000, (introSpeech.length / 15) * 1000 + 3000);
+          const tFallback = setTimeout(() => {
+             // We only go to next if we haven't already left the intro stage
+             goToNext();
+          }, safetyWait);
+          timeouts.push(tFallback);
+
         }, 1500);
         timeouts.push(t2);
         
@@ -584,7 +599,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           setTimeout(() => audioSynth.speak(question.clues![0]), 2000); // speak first clue after 2s
         }
         
-        setTimeLeft(25);
+        const tLimit = question.timeLimit || 25;
+        setTimeLeft(tLimit);
         
         timerRef.current = setInterval(() => {
           if (isPausedRef.current) return;
@@ -596,14 +612,11 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             }
             if (quiz.type !== 'text-presentation' && (quiz.mode !== 'interactive' || prev <= 6)) audioSynth.playTick();
             
-            // At 20s left (5s elapsed) -> clue 1
-            if (prev === 21) { setClueIndex(1); if (question.clues?.[1]) audioSynth.speak(question.clues[1]); }
-            // At 15s left -> clue 2
-            if (prev === 16) { setClueIndex(2); if (question.clues?.[2]) audioSynth.speak(question.clues[2]); }
-            // At 10s left -> clue 3
-            if (prev === 11) { setClueIndex(3); if (question.clues?.[3]) audioSynth.speak(question.clues[3]); }
-            // At 5s left -> clue 4
-            if (prev === 6) { setClueIndex(4); if (question.clues?.[4]) audioSynth.speak(question.clues[4]); }
+            const interval = Math.floor(tLimit / 5);
+            if (prev === tLimit - interval) { setClueIndex(1); if (question.clues?.[1]) audioSynth.speak(question.clues[1]); }
+            if (prev === tLimit - 2*interval) { setClueIndex(2); if (question.clues?.[2]) audioSynth.speak(question.clues[2]); }
+            if (prev === tLimit - 3*interval) { setClueIndex(3); if (question.clues?.[3]) audioSynth.speak(question.clues[3]); }
+            if (prev === tLimit - 4*interval) { setClueIndex(4); if (question.clues?.[4]) audioSynth.speak(question.clues[4]); }
             
             return prev - 1;
           });
@@ -611,7 +624,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       } else if (quiz.type === 'jumbled-letters') {
         setClueIndex(-1);
         audioSynth.speak('Unjumble these letters!');
-        setTimeLeft(25);
+        const tLimit = question.timeLimit || 25;
+        setTimeLeft(tLimit);
         
         timerRef.current = setInterval(() => {
           if (isPausedRef.current) return;
@@ -623,17 +637,16 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             }
             if (quiz.type !== 'text-presentation' && (quiz.mode !== 'interactive' || prev <= 6)) audioSynth.playTick();
             
-            // First clue after 10 seconds (15s left)
-            if (prev === 16) { setClueIndex(0); if (question.clues?.[0]) audioSynth.speak(question.clues[0]); }
-            // Second clue after another 5 seconds (10s left)
-            if (prev === 11) { setClueIndex(1); if (question.clues?.[1]) audioSynth.speak(question.clues[1]); }
+            const interval = Math.floor(tLimit / 3);
+            if (prev === tLimit - interval) { setClueIndex(0); if (question.clues?.[0]) audioSynth.speak(question.clues[0]); }
+            if (prev === tLimit - 2*interval) { setClueIndex(1); if (question.clues?.[1]) audioSynth.speak(question.clues[1]); }
             
             return prev - 1;
           });
         }, 1000);
       } else if (quiz.type === 'detective') {
         audioSynth.speak(question.question || 'Find the fake fact!');
-        setTimeLeft(30); // More time to read sentences
+        setTimeLeft(question.timeLimit || 30); // More time to read sentences
         
         timerRef.current = setInterval(() => {
           if (isPausedRef.current) return;
@@ -660,7 +673,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           setShuffledRights(rights);
         }
 
-        setTimeLeft(30); // Generous time for reading and matching
+        setTimeLeft(question.timeLimit || 30); // Generous time for reading and matching
 
         timerRef.current = setInterval(() => {
           if (isPausedRef.current) return;
@@ -675,8 +688,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           });
         }, 1000);
       } else if (quiz.type === 'word-search') {
-        audioSynth.speak('Find the 5 words! 30 seconds on the clock.');
-        setTimeLeft(30);
+        audioSynth.speak(`Find the 5 words! ${question.timeLimit || 30} seconds on the clock.`);
+        setTimeLeft(question.timeLimit || 30);
         
         timerRef.current = setInterval(() => {
           if (isPausedRef.current) return;
@@ -1043,16 +1056,11 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
     }
 
     if (stage === 'celebrate') {
-      let clapInterval: NodeJS.Timeout;
       let timeoutId: NodeJS.Timeout;
       
       if (quiz.mode !== 'interactive' || celebratingIndex >= playersState.length) {
         setStage('outro');
       } else {
-        audioSynth.playCheer();
-        clapInterval = setInterval(() => {
-          audioSynth.playClap();
-        }, 4000); 
         audioSynth.speak(`Let's celebrate ${playersState[celebratingIndex]?.name}! What an amazing performance. You earned these wonderful prizes!`);
         
         timeoutId = setTimeout(() => {
@@ -1061,7 +1069,6 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       }
       
       return () => {
-        if (clapInterval) clearInterval(clapInterval);
         if (timeoutId) clearTimeout(timeoutId);
         window.speechSynthesis.cancel();
       };
@@ -1203,37 +1210,85 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         {stage === 'intro' && (
           <motion.div
             key="intro"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.2, opacity: 0 }}
-            transition={{ type: "spring", bounce: 0.5 }}
-            className="text-center p-12 max-w-5xl flex flex-col items-center justify-center h-full z-10 mx-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ scale: 1.1, opacity: 0, filter: "blur(10px)" }}
+            transition={{ duration: 1, ease: "easeInOut" }}
+            className="text-center p-12 max-w-7xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full"
           >
-            <motion.div 
-              animate={{ y: [0, -20, 0] }} 
-              transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-              className="w-72 h-72 md:w-96 md:h-96 rounded-full overflow-hidden shadow-[0_0_80px_rgba(255,255,255,0.6)] border-8 border-white mb-12"
+            {quiz.mode === 'interactive' && quiz.isMultiplayer && (quiz.players?.length || 1) > 1 ? (
+              <div className="flex flex-wrap justify-center gap-6 md:gap-12 mb-12 w-full">
+                {playersState.map((player, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ scale: 0.8, y: 50, opacity: 0, filter: "blur(10px)" }}
+                    animate={{ scale: 1, y: 0, opacity: 1, filter: "blur(0px)" }}
+                    transition={{ type: "spring", stiffness: 120, damping: 20, delay: idx * 0.2 }}
+                    className="relative"
+                  >
+                    <div className="w-40 h-40 md:w-56 md:h-56 rounded-full overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-8 border-white group relative">
+                      {player.photo ? (
+                        <img src={player.photo} alt={player.name} className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-6xl md:text-8xl">
+                          {player.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    </div>
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                      className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-white text-indigo-900 px-6 py-2 rounded-full font-black text-xl shadow-xl border-4 border-indigo-100"
+                    >
+                      {player.name}
+                    </motion.div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <motion.div 
+                initial={{ scale: 0.8, opacity: 0, filter: "blur(10px)", y: 50 }}
+                animate={{ scale: 1, opacity: 1, filter: "blur(0px)", y: 0 }}
+                transition={{ type: "spring", stiffness: 100, damping: 20, duration: 1 }}
+                className="w-72 h-72 md:w-96 md:h-96 rounded-full overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-8 border-white mb-12 relative group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <img src={(quiz.mode === 'interactive' && quiz.playerPhoto) ? quiz.playerPhoto : quizLogo} alt="Quiz Time Brain Boosters" className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-700" />
+              </motion.div>
+            )}
+
+            <motion.h1 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className="text-5xl md:text-7xl font-black mb-8 tracking-tight drop-shadow-2xl text-white"
             >
-              <img src={(quiz.mode === 'interactive' && quiz.playerPhoto) ? quiz.playerPhoto : quizLogo} alt="Quiz Time Brain Boosters" className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-700" />
-            </motion.div>
-            <h1 className="text-5xl md:text-7xl font-black mb-8 tracking-tight drop-shadow-2xl text-white">
               {quiz.mode === 'interactive' && isMultipleFiles
                 ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
-                : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
-                  ? `Battle: ${playersState.map(p => p.name).join(' vs ')}`
-                  : (quiz.mode === 'interactive' 
-                    ? `Welcome ${quiz.teamName}!` 
-                    : (quiz.type === 'combat-mode' ? 'Welcome back to Combat Mode!' : 'Welcome back to Quiz Time Brain Boosters')))}
-            </h1>
-            <p className="text-3xl md:text-4xl opacity-100 font-bold text-cyan-100 drop-shadow-lg max-w-3xl leading-snug">
+                : (quiz.mode === 'interactive' && quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+                  ? `Welcome ${playersState.map(p => p.name).join(', ')}!`
+                  : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+                    ? `Battle: ${playersState.map(p => p.name).join(' vs ')}`
+                    : (quiz.mode === 'interactive' 
+                      ? `Welcome ${quiz.teamName}!` 
+                      : (quiz.type === 'combat-mode' ? 'Welcome back to Combat Mode!' : 'Welcome back to Quiz Time Brain Boosters'))))}
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className="text-3xl md:text-4xl opacity-100 font-bold text-cyan-100 drop-shadow-lg max-w-3xl leading-snug"
+            >
               {quiz.mode === 'interactive' && isMultipleFiles
-                ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
+                ? `Today's topic: ${getActiveContextTopic(0)}`
                 : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
-                  ? `Today's topic: ${quiz.title || quiz.topic}`
+                  ? `Today's topic: ${getActiveContextTopic(0)}`
                   : (quiz.mode === 'interactive' && quiz.playerDetails 
                     ? quiz.playerDetails 
-                    : (quiz.type === 'combat-mode' ? `Today we are exploring: ${quiz.title || quiz.topic}. Pair up with a friend! Look at your side of the screen and answer before the time runs out!` : `Today we are exploring: ${quiz.title || quiz.topic}`)))}
-            </p>
+                    : (quiz.type === 'combat-mode' ? `Today we are exploring: ${getActiveContextTopic(0)}. Pair up with a friend! Look at your side of the screen and answer before the time runs out!` : `Today we are exploring: ${getActiveContextTopic(0)}`)))}
+            </motion.p>
           </motion.div>
         )}
 
@@ -1287,8 +1342,9 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             <AnimatePresence>
               {warmupFeeling && (
                 <motion.button
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
                   onClick={() => {
                     audioSynth.playSwoosh();
                     if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
@@ -1318,32 +1374,59 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             key="multiplayer-intro"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.2, opacity: 0 }}
-            className="text-center p-8 max-w-7xl flex flex-col items-center justify-center h-full z-10 w-full mx-auto"
+            exit={{ opacity: 0, transition: { duration: 0.01 } }}
+            className="text-center p-8 max-w-7xl flex flex-col items-center justify-center h-full z-10 w-full mx-auto relative"
           >
-            <h2 className="text-5xl md:text-7xl font-black mb-12 tracking-tight drop-shadow-2xl text-white">
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+              {[...Array(15)].map((_, i) => (
+                <motion.div
+                  key={`star-${i}`}
+                  initial={{ 
+                    x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000), 
+                    y: (typeof window !== 'undefined' ? window.innerHeight : 1000) + 100,
+                    rotate: 0,
+                    scale: Math.random() * 0.8 + 0.5 
+                  }}
+                  animate={{ 
+                    y: -100,
+                    rotate: 360 * (Math.random() > 0.5 ? 1 : -1),
+                    x: (Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000)) 
+                  }}
+                  transition={{ 
+                    duration: 4 + Math.random() * 6, 
+                    repeat: Infinity,
+                    delay: Math.random() * 3 
+                  }}
+                  className="absolute text-4xl"
+                >
+                  {Math.random() > 0.5 ? '⭐' : '🎈'}
+                </motion.div>
+              ))}
+            </div>
+
+            <h2 className="text-5xl md:text-7xl font-black mb-12 tracking-tight drop-shadow-2xl text-white z-10">
               {quiz.mode === 'interactive' && isMultipleFiles
                 ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
                 : "The Challengers"}
             </h2>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 w-full">
+            <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 w-full z-10">
               {playersState.map((player, idx) => (
                 <React.Fragment key={player.id || idx}>
                   {idx > 0 && (
                     <motion.div
-                      initial={{ scale: 0, rotate: -180 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ delay: 0.5 * idx, type: "spring" }}
+                      initial={{ scale: 0, rotate: -180, opacity: 0 }}
+                      animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                      transition={{ delay: 0.6, type: "spring", stiffness: 100, damping: 10 }}
                       className="text-6xl md:text-8xl font-black text-yellow-300 italic drop-shadow-[0_0_30px_rgba(253,224,71,0.8)]"
                     >
                       VS
                     </motion.div>
                   )}
                   <motion.div
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.3 * idx }}
-                    className="flex flex-col items-center bg-white/10 p-8 rounded-3xl backdrop-blur-md border border-white/20 shadow-2xl w-full max-w-sm"
+                    initial={{ scale: 0, rotate: 720, y: 200, opacity: 0 }}
+                    animate={{ scale: 1, rotate: 0, y: 0, opacity: 1 }}
+                    transition={{ delay: 0.2 * idx, type: "spring", stiffness: 70, damping: 12 }}
+                    className="flex flex-col items-center bg-white/10 p-8 rounded-3xl backdrop-blur-md border border-white/20 shadow-2xl w-full max-w-sm relative"
                   >
                     {player.photo ? (
                       <img src={player.photo} alt={player.name} className="w-32 h-32 md:w-48 md:h-48 object-cover rounded-full shadow-[0_0_40px_rgba(255,255,255,0.4)] border-4 border-white mb-6" />
@@ -1360,9 +1443,9 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               ))}
             </div>
             <motion.button
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 2 }}
+              initial={{ scale: 0, y: 50, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              transition={{ delay: 1.2, type: "spring", stiffness: 150, damping: 15 }}
               onClick={() => {
                 audioSynth.playSwoosh();
                 if (categories.length > 1) {
@@ -1371,7 +1454,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   setStage('question-selection');
                 }
               }}
-              className="mt-16 px-12 py-6 rounded-full bg-yellow-400 text-yellow-900 font-black text-3xl shadow-[0_0_50px_rgba(250,204,21,0.6)] hover:scale-105 transition-transform flex items-center gap-4"
+              className="mt-16 px-12 py-6 rounded-full bg-yellow-400 text-yellow-900 font-black text-3xl shadow-[0_0_50px_rgba(250,204,21,0.6)] hover:scale-105 transition-transform flex items-center gap-4 z-10"
             >
               <Play className="w-10 h-10 fill-current" />
               Let the Battle Begin!
@@ -1745,7 +1828,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 )}
                 {(quiz.isOfflineMode || !(question.type?.toLowerCase() === 'identify' || quiz.type?.toLowerCase() === 'identify' || quiz.type === 'identify-image' || quiz.topic?.toLowerCase().startsWith('identify'))) && (
                   <h2 className={`font-extrabold text-slate-800 ${quiz.mode === 'interactive' ? 'text-left' : 'text-center'} leading-tight drop-shadow-sm flex-1 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' || quiz.type === 'jumbled-letters' || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'text-4xl md:text-5xl lg:text-6xl' : 'text-5xl md:text-6xl lg:text-7xl'}`}>
-                    {quiz.type === 'jumbled-letters' ? 'Unjumble the word!' : question.question}
+                    {question.question || 'Unjumble the word!'}
                   </h2>
                 )}
               </div>
@@ -1757,10 +1840,26 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       const word = question.correctAnswer.replace(/\s/g, '').toUpperCase();
                       const letterObjects = word.split('').map((char, i) => ({ char, id: i }));
                       let displayLetters = [];
-                      if (stage === 'reveal' || jumbledOrder.length === 0) {
+                      if (stage === 'reveal') {
                         displayLetters = letterObjects;
                       } else {
-                        displayLetters = jumbledOrder.map(id => letterObjects.find(l => l.id === id)!).filter(Boolean);
+                        const jsonJumbled = (question.question || '').replace(/\s/g, '').toUpperCase();
+                        if (jsonJumbled.length === word.length && jsonJumbled.split('').sort().join('') === word.split('').sort().join('')) {
+                           let available = [...letterObjects];
+                           displayLetters = jsonJumbled.split('').map(char => {
+                              const matchIndex = available.findIndex(l => l.char === char);
+                              if (matchIndex !== -1) {
+                                 const match = available[matchIndex];
+                                 available.splice(matchIndex, 1);
+                                 return match;
+                              }
+                              return { char, id: Math.random() };
+                           });
+                        } else if (jumbledOrder.length > 0) {
+                           displayLetters = jumbledOrder.map(id => letterObjects.find(l => l.id === id)!).filter(Boolean);
+                        } else {
+                           displayLetters = letterObjects;
+                        }
                       }
                       return displayLetters.map((item, i) => (
                         <motion.div 
@@ -2521,8 +2620,27 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   initial={{ y: -50, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ type: 'spring', delay: 0.2 }}
-                  className="mb-8 z-20"
+                  className="mb-8 z-20 flex flex-col items-center"
                 >
+                  {playersState[celebratingIndex].photo ? (
+                    <motion.img 
+                      src={playersState[celebratingIndex].photo} 
+                      alt={playersState[celebratingIndex].name}
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: "spring", bounce: 0.5, duration: 1, delay: 0.5 }}
+                      className="w-48 h-48 md:w-64 md:h-64 rounded-full object-cover border-8 border-white shadow-[0_0_50px_rgba(255,255,255,0.8)] mb-8"
+                    />
+                  ) : (
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: "spring", bounce: 0.5, duration: 1, delay: 0.5 }}
+                      className="w-48 h-48 md:w-64 md:h-64 rounded-full bg-indigo-500 text-white flex items-center justify-center font-black text-7xl md:text-8xl border-8 border-white shadow-[0_0_50px_rgba(255,255,255,0.8)] mb-8"
+                    >
+                      {playersState[celebratingIndex].name.charAt(0).toUpperCase()}
+                    </motion.div>
+                  )}
                   <h2 className="text-5xl md:text-7xl font-black text-white mb-4 uppercase tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]">
                     Congratulations!
                   </h2>

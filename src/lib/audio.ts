@@ -433,10 +433,21 @@ class AudioSynth {
       let expressiveText = text.replace(/([.!?])\s*/g, '$1  '); // add extra space after punctuation for natural pause
       
       const utterance = new SpeechSynthesisUtterance(expressiveText);
+      // Keep a reference to prevent garbage collection which breaks onend in Chrome
+      if (!window.__activeUtterances) window.__activeUtterances = new Set();
+      window.__activeUtterances.add(utterance);
+
       
-      if (onEnd) {
-        utterance.onend = onEnd;
-      }
+      utterance.onend = () => {
+        if (window.__activeUtterances) window.__activeUtterances.delete(utterance);
+        if (onEnd) onEnd();
+      };
+      utterance.onerror = (e) => {
+        console.warn("Speech error", e);
+        if (window.__activeUtterances) window.__activeUtterances.delete(utterance);
+        if (onEnd) onEnd();
+      };
+
       
       // Try to find a good voice based on preference
       const voices = window.speechSynthesis.getVoices();

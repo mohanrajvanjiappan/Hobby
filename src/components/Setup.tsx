@@ -482,7 +482,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
       audioSynth.setMusicPreference(musicEnabled);
 
       const combinedQuiz: Quiz = {
-        title: files.length > 1 ? `Combined Quiz (${files.length} Files Loaded)` : (firstTitle || files[0].name.replace(/\.[^/.]+$/, "")),
+        title: files.length > 1 ? (firstTitle || "Combined Quiz") : (firstTitle || files[0].name.replace(/\.[^/.]+$/, "")),
         topic: firstTopic || (files.length > 1 ? "Multiple JSON Files" : files[0].name.replace(/\.[^/.]+$/, "")),
         type: (firstType as any) || "multiple-choice",
         theme: {
