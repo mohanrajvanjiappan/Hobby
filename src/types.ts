@@ -86,6 +86,7 @@ export interface Quiz {
   playerPhoto?: string;
   playerDetails?: string;
   participantTopic?: string;
+  rules?: string;
   frameSize?: 'small' | 'medium' | 'large';
   showFrames?: boolean;
   showBadges?: boolean;

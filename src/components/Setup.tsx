@@ -28,12 +28,14 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
   const [numPlayers, setNumPlayers] = useState(1);
   const [players, setPlayers] = useState<any[]>([{ id: '1', name: '', photo: '', details: '', topic: '', score: 0 }]);
   const [identifyMode, setIdentifyMode] = useState<'auto' | 'custom' | 'json'>('auto');
+  const [identifyMultiChoice, setIdentifyMultiChoice] = useState(true);
   const [jsonItems, setJsonItems] = useState<any[]>([]);
   const [jsonFileNames, setJsonFileNames] = useState<string[]>([]);
   const [customImages, setCustomImages] = useState<{ id: string; file: File; base64: string; name: string }[]>([]);
   const [playerPhoto, setPlayerPhoto] = useState<string>('');
   const [playerDetails, setPlayerDetails] = useState('');
   const [participantTopic, setParticipantTopic] = useState('');
+  const [rules, setRules] = useState('');
   const [frameSize, setFrameSize] = useState<'small' | 'medium' | 'large'>('large');
   const [showFrames, setShowFrames] = useState<boolean>(true);
   const [showBadges, setShowBadges] = useState<boolean>(true);
@@ -227,7 +229,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
     setError('');
     
     try {
-      const payload: any = { topic, numQuestions: quizType === 'mega-quiz' ? 100 : numQuestions, difficulty, quizType };
+      const payload: any = { topic, numQuestions: quizType === 'mega-quiz' ? 100 : numQuestions, difficulty, quizType, identifyMultiChoice };
       if (quizType === 'identify-image' && identifyMode === 'custom') {
         payload.customItems = customImages.map(img => ({ id: img.id, name: img.name }));
       } else if (quizType === 'identify-image' && identifyMode === 'json') {
@@ -248,6 +250,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
       data.mode = mode;
       data.showBadges = showBadges;
       data.enableClapping = enableClapping;
+      data.rules = rules || undefined;
       
       if (quizType === 'identify-image' && identifyMode === 'custom') {
         data.questions = data.questions.map((q: any) => {
@@ -375,6 +378,37 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
           timeLimit: 10
         }
       ];
+    } else if (quizType === 'mega-quiz') {
+      title = "Offline Mega Quiz";
+      finalType = "mega-quiz";
+      dlName = "mega-quiz";
+      questions = [
+        {
+          type: "multiple-choice",
+          category: "General Knowledge",
+          question: "What is 2 + 2?",
+          options: ["3", "4", "5", "6"],
+          correctAnswer: "4",
+          timeLimit: 15
+        },
+        {
+          type: "identify-image",
+          category: "Brands",
+          question: "Identify this brand",
+          imageUrl: "",
+          options: ["Tesla", "Toyota", "Ford", "Honda"],
+          correctAnswer: "Tesla",
+          timeLimit: 15
+        },
+        {
+          type: "jumbled-letters",
+          category: "Vocabulary",
+          question: "Unjumble the word",
+          word: "REACT",
+          correctAnswer: "REACT",
+          timeLimit: 15
+        }
+      ];
     } else {
       questions = [
         {
@@ -424,11 +458,38 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
       let firstTopic = '';
       let firstType = '';
 
-      for (const file of files) {
+      const imageFiles = files.filter(f => f.type.startsWith('image/'));
+      const jsonFiles = files.filter(f => f.name.endsWith('.json'));
+
+      if (imageFiles.length > 0) {
+        if (!firstTitle) firstTitle = "Combined Quiz";
+        if (!firstTopic) firstTopic = "Multiple Categories";
+        if (!firstType) firstType = "identify-image";
+
+        for (const file of imageFiles) {
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target?.result as string);
+            reader.readAsDataURL(file);
+          });
+          const name = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+          combinedQuestions.push({
+            question: "Identify this",
+            correctAnswer: name,
+            answer: name,
+            type: "identify-image",
+            category: "Identify the Image",
+            imageUrl: base64,
+            imagePreviewUrl: base64,
+            options: []
+          });
+        }
+      }
+
+      for (const file of jsonFiles) {
         const fallbackCategory = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
         const text = await file.text();
         const json = JSON.parse(text);
-
         // Fetch category from top-level title field if available
         const fileCategory = (json && !Array.isArray(json) && json.title)
           ? json.title
@@ -438,8 +499,8 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
           const items = json.map(item => ({
             ...item,
             correctAnswer: item.correctAnswer || item.answer || item.word || item.correct_answer || item.brand_name || '',
-            type: item.type || firstType || 'jumbled-letters',
-            category: (files.length > 1) ? fileCategory : (item.category || fileCategory)
+            type: item.type || (firstType !== 'identify-image' ? firstType : 'multiple-choice'),
+            category: item.category || fileCategory
           }));
           combinedQuestions.push(...items);
         } else if (json && json.questions && Array.isArray(json.questions)) {
@@ -454,8 +515,8 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
           const questionsWithCategory = json.questions.map((q: any) => ({
             ...q,
             correctAnswer: q.correctAnswer || q.answer || q.word || q.correct_answer || q.brand_name || '',
-            type: q.type || json.type || firstType || 'jumbled-letters',
-            category: (files.length > 1) ? fileCategory : (q.category || fileCategory)
+            type: q.type || json.type || (firstType !== 'identify-image' ? firstType : 'multiple-choice'),
+            category: q.category || fileCategory
           }));
           combinedQuestions.push(...questionsWithCategory);
         } else {
@@ -666,10 +727,23 @@ return (
             <h2 className="text-2xl font-bold text-slate-800">Offline Quiz Loaded!</h2>
             <p className="text-slate-600">"{loadedOfflineQuiz.title || loadedOfflineQuiz.topic}" is ready to play.</p>
             
+            <div className="space-y-2 text-left mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-indigo-500" />
+                Rules (Optional)
+              </label>
+              <textarea
+                value={rules}
+                onChange={(e) => setRules(e.target.value)}
+                placeholder="Enter the rules of the quiz here. Each line will be a bullet point."
+                className="w-full px-4 py-3 rounded-xl border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 bg-white min-h-[120px]"
+              />
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-4 mt-8">
               <button
                 type="button"
-                onClick={() => onQuizGenerated({ ...loadedOfflineQuiz, mode: 'video', showBadges })}
+                onClick={() => onQuizGenerated({ ...loadedOfflineQuiz, mode: 'video', showBadges, rules: rules || undefined })}
                 className="flex-1 py-4 rounded-xl bg-emerald-600 text-white font-bold text-lg hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-500/30 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
               >
                 <Play className="w-6 h-6 fill-current" />
@@ -678,7 +752,7 @@ return (
               <button
                 type="button"
                 onClick={() => {
-                  setPendingInteractiveQuiz({ ...loadedOfflineQuiz, mode: 'interactive', showBadges });
+                  setPendingInteractiveQuiz({ ...loadedOfflineQuiz, mode: 'interactive', showBadges, rules: rules || undefined });
                   setLoadedOfflineQuiz(null);
                 }}
                 className="flex-1 py-4 rounded-xl bg-fuchsia-600 text-white font-bold text-lg hover:bg-fuchsia-700 focus:outline-none focus:ring-4 focus:ring-fuchsia-500/30 transition-all flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-600/20"
@@ -844,6 +918,7 @@ return (
                   playerPhoto: players[0]?.photo || playerPhoto, 
                   playerDetails: players[0]?.details || playerDetails, 
                   participantTopic: players[0]?.topic || participantTopic,
+                  rules: pendingInteractiveQuiz.rules || undefined,
                   frameSize: frameSize,
                   showFrames: showFrames,
                   showBadges: showBadges,
@@ -1051,6 +1126,20 @@ return (
             />
           </div>
           
+          {/* Rules Text Area */}
+          <div className="space-y-2 text-left p-4 bg-slate-50 border border-slate-200 rounded-xl mt-4">
+            <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-indigo-500" />
+              Rules (Optional)
+            </label>
+            <textarea
+              value={rules}
+              onChange={(e) => setRules(e.target.value)}
+              placeholder="Enter the rules of the quiz here. Each line will be a bullet point."
+              className="w-full px-4 py-3 rounded-xl border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 bg-white min-h-[120px]"
+            />
+          </div>
+          
           {quizType === 'identify-image' && (
             <div className="mt-4 p-4 rounded-xl border border-neutral-200 bg-neutral-50/50 space-y-4">
               <div className="flex gap-2 p-1 bg-neutral-200/50 rounded-lg">
@@ -1157,6 +1246,20 @@ return (
                   <button type="button" onClick={downloadJsonTemplate} className="text-sm text-indigo-600 font-bold hover:underline">
                     Download JSON Template
                   </button>
+                </div>
+              )}
+              {((identifyMode === 'custom' && customImages.length > 0) || (identifyMode === 'json' && jsonItems.length > 0)) && (
+                <div className="flex items-center gap-2 mt-4 p-3 bg-white rounded-lg border border-neutral-200 shadow-sm">
+                  <input 
+                    type="checkbox" 
+                    id="multiChoiceToggle"
+                    checked={identifyMultiChoice}
+                    onChange={(e) => setIdentifyMultiChoice(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                  />
+                  <label htmlFor="multiChoiceToggle" className="text-sm font-semibold text-neutral-700 cursor-pointer">
+                    Multiple Choice Round (Generate Options)
+                  </label>
                 </div>
               )}
               {identifyMode === 'custom' && (
@@ -1285,10 +1388,10 @@ return (
               
               <label className="flex-1 py-3 px-4 rounded-xl bg-white border-2 border-indigo-100 text-indigo-600 font-bold hover:bg-indigo-50 hover:border-indigo-200 transition-all flex items-center justify-center gap-2 cursor-pointer">
                 <Upload className="w-5 h-5" />
-                Upload JSON(s)
+                Upload JSON & Image(s)
                 <input
                   type="file"
-                  accept=".json"
+                  accept=".json,image/*"
                   multiple
                   className="hidden"
                   ref={fileInputRef}

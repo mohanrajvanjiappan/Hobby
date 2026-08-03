@@ -177,7 +177,7 @@ ${textContent}
 
   app.post("/api/generate-quiz", async (req, res) => {
     try {
-      let { topic, numQuestions, difficulty, quizType = 'multiple-choice', customItems } = req.body;
+      let { topic, numQuestions, difficulty, quizType = 'multiple-choice', customItems, identifyMultiChoice = true } = req.body;
       if (!topic || !topic.trim()) {
         topic = 'Item';
       }
@@ -201,7 +201,11 @@ ${textContent}
       }
       let contents = `Generate a kids quiz about "${topic}". The difficulty should be ${difficulty}. Generate ${targetNumQuestions} questions.`;
       if (customItems && customItems.length > 0) {
-        contents = `This is an 'Identify the Image' round based on custom items. There are ${customItems.length} items. Generate exactly 1 question for each item. For each item: - The 'id' MUST exactly match the provided item id. - The 'question' should be 'Identify this ${topic === 'Item' ? 'Item' : topic}'. - The 'correctAnswer' MUST exactly match the provided item name. - Generate 3 plausible but incorrect options. If the items share a common category, use that category for the incorrect options. The final 'options' array must contain the correct answer and the 3 incorrect options, shuffled. - 'timeLimit' should be 10 seconds. Here are the items: ${JSON.stringify(customItems)}`;
+        if (identifyMultiChoice) {
+          contents = `This is an 'Identify the Image' round based on custom items. There are ${customItems.length} items. Generate exactly 1 question for each item. For each item: - The 'id' MUST exactly match the provided item id. - The 'question' should be 'Identify this ${topic === 'Item' ? 'Item' : topic}'. - The 'correctAnswer' MUST exactly match the provided item name. - Generate 3 plausible but incorrect options. If the items share a common category, use that category for the incorrect options. The final 'options' array must contain the correct answer and the 3 incorrect options, shuffled. - 'timeLimit' should be 10 seconds. Here are the items: ${JSON.stringify(customItems)}`;
+        } else {
+          contents = `This is an 'Identify the Image' round based on custom items. There are ${customItems.length} items. Generate exactly 1 question for each item. For each item: - The 'id' MUST exactly match the provided item id. - The 'question' should be 'Identify this ${topic === 'Item' ? 'Item' : topic}'. - The 'correctAnswer' MUST exactly match the provided item name. DO NOT generate options. - 'timeLimit' should be 10 seconds. Here are the items: ${JSON.stringify(customItems)}`;
+        }
       }
       
       let questionSchemaProps: any = {
@@ -222,19 +226,28 @@ ${textContent}
           description: "4 multiple choice options."
         };
       } else if (quizType === 'identify-image') {
-        requiredQuestionProps.push("options");
-        questionSchemaProps.options = {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-          description: "4 multiple choice options."
-        };
+        if (identifyMultiChoice) {
+          requiredQuestionProps.push("options");
+          questionSchemaProps.options = {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "4 multiple choice options."
+          };
+        }
       }
 
       if (quizType === 'identify-image') {
-        contents += ` This is an 'Identify the Image' round. For each question, provide a 'question' which is just 'Identify this [topic/category]', the 'correctAnswer', and 4 'options'. 
+        if (identifyMultiChoice) {
+          contents += ` This is an 'Identify the Image' round. For each question, provide a 'question' which is just 'Identify this [topic/category]', the 'correctAnswer', and 4 'options'. 
 CRITICAL RULES FOR ACCURACY:
 1. The answers MUST be strictly limited to the user's specific requested topic: "${topic}". If the topic is 'cars', ONLY use actual cars (e.g., Ford Mustang, Toyota Corolla), DO NOT use buses, trucks, or motorcycles. If it's 'dogs', ONLY use dog breeds.
 2. Provide an 'imageSearchQuery' to fetch a highly specific, high-quality photo of the answer. Add terms like "-watermark -stock", "high quality", "clear photo", or "isolated" to ensure good results. DO NOT mention the answer in the question text.`;
+        } else {
+          contents += ` This is an 'Identify the Image' round. For each question, provide a 'question' which is just 'Identify this [topic/category]' and the 'correctAnswer'. DO NOT generate 'options'.
+CRITICAL RULES FOR ACCURACY:
+1. The answers MUST be strictly limited to the user's specific requested topic: "${topic}". If the topic is 'cars', ONLY use actual cars (e.g., Ford Mustang, Toyota Corolla), DO NOT use buses, trucks, or motorcycles. If it's 'dogs', ONLY use dog breeds.
+2. Provide an 'imageSearchQuery' to fetch a highly specific, high-quality photo of the answer. Add terms like "-watermark -stock", "high quality", "clear photo", or "isolated" to ensure good results. DO NOT mention the answer in the question text.`;
+        }
       } else if (quizType === '5-clues') {
         contents += ` This is a 'Guess in 5 clues' round. For each question, provide exactly 5 simple clues that progressively reveal the answer. The question text can be like 'Who am I?', 'What am I?', or 'Where am I?'. Provide 4 multiple choice options.`;
         questionSchemaProps.clues = {

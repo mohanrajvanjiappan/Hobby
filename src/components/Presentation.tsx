@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Quiz } from '../types';
 import { audioSynth } from '../lib/audio';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson } from 'lucide-react';
+import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload } from 'lucide-react';
 import quizLogo from '../assets/images/quiz_logo_1783447286811.jpg';
 import MapQuestion from './MapQuestion';
 
@@ -12,7 +12,7 @@ interface PresentationProps {
   onExit: () => void;
 }
 
-type Stage = 'intro' | 'multiplayer-intro' | 'warmup' | 'countdown' | 'category-selection' | 'question-selection' | 'question' | 'reveal' | 'quote' | 'score' | 'badges' | 'talk' | 'celebrate' | 'outro' | 'video-badges';
+type Stage = 'intro' | 'multiplayer-intro' | 'rules' | 'warmup' | 'countdown' | 'category-selection' | 'question-selection' | 'question' | 'reveal' | 'quote' | 'score' | 'badges' | 'talk' | 'celebrate' | 'outro' | 'video-badges';
 
 const OUTRO_MESSAGES = [
   {
@@ -260,6 +260,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   const [usedFiftyFifty, setUsedFiftyFifty] = useState<Record<string, boolean>>({});
   const [eliminatedOptions, setEliminatedOptions] = useState<number[]>([]);
   const [jumbledInput, setJumbledInput] = useState<string>("");
+  const [uploadedImages, setUploadedImages] = useState<Record<number, string>>({});
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const categories = useMemo(() => Array.from(new Set(quiz.questions.map(q => q.category).filter(Boolean))) as string[], [quiz.questions]);
   const isMultipleFiles = useMemo(() => Boolean(
@@ -420,11 +421,23 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   }, [quiz.type]);
 
   const question = quiz.questions[currentQuestionIndex];
+  const currentType = question?.type || quiz.type;
+
+  const isImageQuestion = Boolean(
+    currentType === 'identify-image' || 
+    currentType?.toLowerCase() === 'identify' ||
+    question?.category?.toLowerCase().includes('identify') ||
+    question?.category?.toLowerCase().includes('image') ||
+    (!quiz.isMultipleFilesLoaded && (quiz.topic?.toLowerCase().startsWith('identify')))
+  );
+
+  const isImageIdentifyWithoutOptions = Boolean(
+    isImageQuestion && (question && (!question.options || question.options.length === 0))
+  );
 
   const isJumbledLetters = Boolean(
-    quiz.type === 'jumbled-letters' ||
-    question?.type === 'jumbled-letters' ||
-    (question && (question.correctAnswer || question.answer || question.word || question.correct_answer || question.brand_name) && (!question.options || question.options.length === 0) && !question.combatLeft && !question.grid && !question.pairs && !question.sentences)
+    currentType === 'jumbled-letters' ||
+    (question && (question.correctAnswer || question.answer || question.word || question.correct_answer || question.brand_name) && (!question.options || question.options.length === 0) && !question.combatLeft && !question.grid && !question.pairs && !question.sentences && !isImageIdentifyWithoutOptions)
   );
 
   const jumbledLettersForQuestion = useMemo(() => {
@@ -536,20 +549,31 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           const names = playersState.map(p => p.name);
           const playerNames = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0] || 'the players';
           let introSpeech = `Welcome back to Quiz Time Brain Boosters. Today we are exploring ${getActiveContextTopic(0)}.`;
-          if (quiz.mode === 'interactive' && isMultipleFiles) {
-            introSpeech = `Welcome back to Quiz Time Brain Boosters. It's Challenge between ${playerNames}.`;
-          } else if (quiz.mode === 'interactive' && quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
-            introSpeech = `Welcome ${playerNames}! Today we are exploring ${getActiveContextTopic(0)}.`;
-          } else if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
-            introSpeech = `Welcome back to Quiz Time Brain Boosters. Today's battle is between ${playerNames}. The topic is ${getActiveContextTopic(0)}.`;
-          } else if (quiz.teamName && quiz.mode === 'interactive') {
-            introSpeech = `Welcome ${quiz.teamName}. Today we are exploring ${getActiveContextTopic(0)}.`;
-          }
-
-          if (quiz.type === 'combat-mode') {
-            introSpeech = `Welcome back to Combat Mode! Today's topic is ${getActiveContextTopic(0)}. Pair up with a friend. Look at your side of the screen and answer before the time runs out!`;
-          } else if (quiz.type === 'word-search') {
-            introSpeech = `Welcome back to Word Search! Today's topic is ${getActiveContextTopic(0)}. Find the 5 hidden words in the grid. You have 30 seconds. Look left-to-right, and top-to-bottom only!`;
+          if (isMultipleFiles) {
+            const roundsSpeech = `Today's rounds are: ${categories.join(', ')}.`;
+            if (quiz.mode === 'interactive') {
+              introSpeech = `Welcome back to Quiz Time Brain Boosters. It's Challenge between ${playerNames}. ${roundsSpeech}`;
+            } else {
+              introSpeech = `Welcome back to Quiz Time Brain Boosters. ${roundsSpeech}`;
+            }
+          } else {
+            if (quiz.mode === 'interactive') {
+              if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
+                introSpeech = `Welcome ${playerNames}!`;
+              } else if (quiz.teamName) {
+                introSpeech = `Welcome ${quiz.teamName}.`;
+              } else {
+                introSpeech = `Welcome back to Quiz Time Brain Boosters.`;
+              }
+            } else {
+              if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
+                introSpeech = `Welcome back to Quiz Time Brain Boosters. Today's battle is between ${playerNames}. The topic is ${getActiveContextTopic(0)}.`;
+              } else if (quiz.type === 'combat-mode') {
+                introSpeech = `Welcome back to Combat Mode! Today's topic is ${getActiveContextTopic(0)}. Pair up with a friend. Look at your side of the screen and answer before the time runs out!`;
+              } else if (currentType === 'word-search') {
+                introSpeech = `Welcome back to Word Search! Today's topic is ${getActiveContextTopic(0)}. Find the 5 hidden words in the grid. You have 30 seconds. Look left-to-right, and top-to-bottom only!`;
+              }
+            }
           }
           
           const goToNext = () => {
@@ -588,6 +612,68 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         window.speechSynthesis.cancel();
       };
     }
+    
+    if (stage === 'multiplayer-intro' && quiz.mode !== 'interactive') {
+      let timeouts: NodeJS.Timeout[] = [];
+      const t1 = setTimeout(() => {
+        const names = playersState.map(p => p.name);
+        const playerNames = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
+        const speech = `The challengers are ${playerNames}.`;
+        
+        const goToNext = () => {
+          const t2 = setTimeout(() => {
+            audioSynth.playSwoosh();
+            if (quiz.rules) {
+              setStage('rules');
+            } else if (categories.length > 1) {
+              setStage('category-selection');
+            } else {
+              setStage('question-selection');
+            }
+          }, 2000);
+          timeouts.push(t2);
+        };
+        
+        audioSynth.speak(speech, goToNext);
+        const fallbackWait = Math.max(5000, (speech.length / 15) * 1000 + 2000);
+        timeouts.push(setTimeout(goToNext, fallbackWait));
+      }, 1000);
+      timeouts.push(t1);
+      
+      return () => {
+        timeouts.forEach(clearTimeout);
+        window.speechSynthesis.cancel();
+      };
+    }
+
+    if (stage === 'rules' && quiz.mode !== 'interactive') {
+      let timeouts: NodeJS.Timeout[] = [];
+      const t1 = setTimeout(() => {
+        const speech = "Here are the rules. " + (quiz.rules?.split('\n').join('. ') || '');
+        
+        const goToNext = () => {
+          const t2 = setTimeout(() => {
+            audioSynth.playSwoosh();
+            if (categories.length > 1) {
+              setStage('category-selection');
+            } else {
+              setStage('question-selection');
+            }
+          }, 2000);
+          timeouts.push(t2);
+        };
+        
+        audioSynth.speak(speech, goToNext);
+        const fallbackWait = Math.max(5000, (speech.length / 15) * 1000 + 2000);
+        timeouts.push(setTimeout(goToNext, fallbackWait));
+      }, 1000);
+      timeouts.push(t1);
+      
+      return () => {
+        timeouts.forEach(clearTimeout);
+        window.speechSynthesis.cancel();
+      };
+    }
 
     if (stage === 'countdown') {
       let current = 5;
@@ -612,7 +698,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       // Ensure we stop any previous bgm just in case
       audioSynth.stopBackgroundMusic();
 
-      if (quiz.type === 'text-presentation') {
+      if (currentType === 'text-presentation') {
         setClueIndex(-1);
         audioSynth.speak(question.insight || question.question);
         setTimeLeft(question.timeLimit || 15);
@@ -663,7 +749,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             });
           }, 1000);
         }
-      } else if ((quiz.type === '5-clues' || question.type === '5-clues') && !isJumbledLetters) {
+      } else if ((currentType === '5-clues' || question.type === '5-clues') && !isJumbledLetters) {
         setClueIndex(0);
         audioSynth.speak(question.question || 'Can you guess from these clues?');
         if (question.clues?.[0]) {
@@ -681,7 +767,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               setStage('reveal');
               return 0;
             }
-            if (quiz.type !== 'text-presentation' && (quiz.mode !== 'interactive' || prev <= 6)) audioSynth.playTick();
+            if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
             
             const interval = Math.floor(tLimit / 5);
             if (prev === tLimit - interval) { setClueIndex(1); if (question.clues?.[1]) audioSynth.speak(question.clues[1]); }
@@ -706,7 +792,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               setStage('reveal');
               return 0;
             }
-            if (quiz.type !== 'text-presentation' && (quiz.mode !== 'interactive' || prev <= 6)) audioSynth.playTick();
+            if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
             
             const interval = Math.floor(tLimit / 3);
             if (prev === tLimit - interval) { setClueIndex(0); if (question.clues?.[0]) audioSynth.speak(question.clues[0]); }
@@ -715,7 +801,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             return prev - 1;
           });
         }, 1000);
-      } else if (quiz.type === 'detective') {
+      } else if (currentType === 'detective') {
         audioSynth.speak(question.question || 'Find the fake fact!');
         setTimeLeft(question.timeLimit || 30); // More time to read sentences
         
@@ -727,11 +813,11 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               setStage('reveal');
               return 0;
             }
-            if (quiz.type !== 'text-presentation' && (quiz.mode !== 'interactive' || prev <= 6)) audioSynth.playTick();
+            if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
             return prev - 1;
           });
         }, 1000);
-      } else if (quiz.type === 'match-the-following') {
+      } else if (currentType === 'match-the-following') {
         audioSynth.speak(question.question || 'Match the following!');
         
         if (question.pairs) {
@@ -754,11 +840,11 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               setStage('reveal');
               return 0;
             }
-            if (quiz.type !== 'text-presentation' && (quiz.mode !== 'interactive' || prev <= 6)) audioSynth.playTick();
+            if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
             return prev - 1;
           });
         }, 1000);
-      } else if (quiz.type === 'word-search') {
+      } else if (currentType === 'word-search') {
         audioSynth.speak(`Find the 5 words! ${question.timeLimit || 30} seconds on the clock.`);
         setTimeLeft(question.timeLimit || 30);
         
@@ -770,7 +856,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               setStage('reveal');
               return 0;
             }
-            if (quiz.type !== 'text-presentation' && (quiz.mode !== 'interactive' || prev <= 6)) audioSynth.playTick();
+            if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
             return prev - 1;
           });
         }, 1000);
@@ -801,7 +887,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               setStage('reveal');
               return 0;
             }
-            if (quiz.type !== 'text-presentation' && (quiz.mode !== 'interactive' || prev <= 6)) audioSynth.playTick();
+            if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
             return prev - 1;
           });
         }, 1000);
@@ -820,13 +906,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       }
       
       let speechText = `The correct answer is ${question.correctAnswer}.`;
-      if (quiz.type === 'detective') {
+      if (currentType === 'detective') {
         speechText = `The fake fact is fact number ${question.fakeSentenceIndex! + 1}. ${question.insight}`;
-      } else if (quiz.type === 'match-the-following') {
+      } else if (currentType === 'match-the-following') {
         speechText = `Here are the correct matches! ` + (question.pairs?.map(p => `${p.left} matches with ${p.right}`).join('. ') || '');
       } else if (quiz.type === 'combat-mode') {
         speechText = ``;
-      } else if (quiz.type === 'word-search') {
+      } else if (currentType === 'word-search') {
         speechText = `The hidden words are ${question.wordsToFind?.join(', ')}.`;
       } else if (question.insight) {
         speechText = `The correct answer is ${question.correctAnswer}. ${question.insight}`;
@@ -989,7 +1075,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         spread: 70,
         origin: { y: 0.6 }
       });
-      const numAnswered = (quiz.mode === 'interactive' && quiz.type !== 'combat-mode') 
+      const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
+      const numAnswered = isInteractiveGrid 
         ? answeredQuestions.size 
         : currentQuestionIndex + 1;
         
@@ -1033,7 +1120,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       const generatedBadges = [];
       
       const activeContextTopic = getActiveContextTopic();
-      const scorePerQuestion = (quiz.mode === 'interactive' && quiz.type === '5-clues') ? 10 : (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1);
+      const scorePerQuestion = (quiz.mode === 'interactive' && currentType === '5-clues') ? 10 : (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1);
       
       const usedBadges = new Set();
       
@@ -1186,7 +1273,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
 
   const getAwardPoints = () => {
     let inc = (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1);
-    if (quiz.mode === 'interactive' && quiz.type === '5-clues') {
+    if (quiz.mode === 'interactive' && currentType === '5-clues') {
       inc = 10;
       if (clueIndex === 2) inc = 9;
       else if (clueIndex === 3) inc = 8;
@@ -1234,9 +1321,22 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
     setStage('reveal');
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setUploadedImages(prev => ({ ...prev, [currentQuestionIndex]: event.target!.result as string }));
+          setImageError(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white selection:bg-white/30">
+    <div className="presentation-container fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white selection:bg-white/30">
 
       {/* Background Floating Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
@@ -1364,13 +1464,15 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               transition={{ type: "spring", stiffness: 200, damping: 20 }}
               className="text-3xl md:text-4xl opacity-100 font-bold text-cyan-100 drop-shadow-lg max-w-3xl leading-snug"
             >
-              {quiz.mode === 'interactive' && isMultipleFiles
-                ? `Today's topic: ${getActiveContextTopic(0)}`
-                : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
-                  ? `Today's topic: ${getActiveContextTopic(0)}`
-                  : (quiz.mode === 'interactive' && quiz.playerDetails 
-                    ? quiz.playerDetails 
-                    : (quiz.type === 'combat-mode' ? `Today we are exploring: ${getActiveContextTopic(0)}. Pair up with a friend! Look at your side of the screen and answer before the time runs out!` : `Today we are exploring: ${getActiveContextTopic(0)}`)))}
+              {isMultipleFiles
+                ? `Today's rounds: ${categories.join(', ')}`
+                : (quiz.mode === 'interactive'
+                  ? (quiz.playerDetails ? quiz.playerDetails : '')
+                  : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+                    ? `Today's topic: ${getActiveContextTopic(0)}`
+                    : (quiz.type === 'combat-mode' 
+                      ? `Today we are exploring: ${getActiveContextTopic(0)}. Pair up with a friend! Look at your side of the screen and answer before the time runs out!` 
+                      : `Today we are exploring: ${getActiveContextTopic(0)}`)))}
             </motion.p>
           </motion.div>
         )}
@@ -1519,7 +1621,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       </div>
                     )}
                     <h3 className="text-4xl md:text-5xl font-bold text-white drop-shadow-md mb-2">{player.name}</h3>
-                    {(!isMultipleFiles || quiz.mode !== 'interactive') && player.topic && <p className="text-xl text-indigo-200 font-semibold mb-2">Topic: {player.topic}</p>}
+                    {quiz.mode !== 'interactive' && player.topic && <p className="text-xl text-indigo-200 font-semibold mb-2">Topic: {player.topic}</p>}
                     {player.details && <p className="text-lg text-white/80 italic text-center leading-tight">"{player.details}"</p>}
                   </motion.div>
                 </React.Fragment>
@@ -1531,7 +1633,9 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               transition={{ delay: 1.2, type: "spring", stiffness: 150, damping: 15 }}
               onClick={() => {
                 audioSynth.playSwoosh();
-                if (categories.length > 1) {
+                if (quiz.rules) {
+                  setStage('rules');
+                } else if (categories.length > 1) {
                   setStage('category-selection');
                 } else {
                   setStage('question-selection');
@@ -1541,6 +1645,55 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             >
               <Play className="w-10 h-10 fill-current" />
               Let the Battle Begin!
+            </motion.button>
+          </motion.div>
+        )}
+
+        {stage === 'rules' && (
+          <motion.div
+            key="rules"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.2 } }}
+            className="p-8 max-w-5xl flex flex-col items-center justify-center h-full z-10 w-full mx-auto"
+          >
+            <motion.h2 
+              initial={{ y: -50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="text-5xl md:text-7xl font-black mb-12 tracking-tight drop-shadow-2xl text-white text-center"
+            >
+              Rules of the Quiz
+            </motion.h2>
+            <div className="bg-white/10 p-8 md:p-12 rounded-[3rem] backdrop-blur-md border border-white/20 shadow-2xl w-full text-center flex flex-col gap-6">
+              {quiz.rules?.split('\n').filter(r => r.trim()).map((rule, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.6 + 0.5, type: "spring", stiffness: 100 }}
+                  className="text-2xl md:text-4xl text-white font-bold drop-shadow-md leading-relaxed"
+                >
+                  <span className="text-yellow-400 mr-3">✦</span>
+                  {rule}
+                </motion.div>
+              ))}
+            </div>
+            <motion.button
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: (quiz.rules?.split('\n').filter(r => r.trim()).length || 0) * 0.4 + 1.0, type: "spring", stiffness: 150 }}
+              onClick={() => {
+                audioSynth.playSwoosh();
+                if (categories.length > 1) {
+                  setStage('category-selection');
+                } else {
+                  setStage('question-selection');
+                }
+              }}
+              className="mt-12 px-12 py-6 rounded-full bg-yellow-400 text-yellow-900 font-black text-3xl shadow-[0_0_50px_rgba(250,204,21,0.6)] hover:scale-105 transition-transform flex items-center gap-4 z-10"
+            >
+              <Play className="w-10 h-10 fill-current" />
+              Start
             </motion.button>
           </motion.div>
         )}
@@ -1727,10 +1880,10 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             key={`q-container-${currentQuestionIndex}`}
             className="relative"
             style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.02 }}
-            transition={{ duration: 0.5, ease: "easeInOut" }}
+            initial={{ opacity: 0, x: 100, scale: 0.98 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -100, scale: 1.02 }}
+            transition={{ type: "spring", stiffness: 200, damping: 25 }}
           >
             {quiz.mode === 'interactive' && (
               <ParticipantVideoFrames
@@ -1751,6 +1904,40 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </motion.div>
             )}
 
+            {stage === 'reveal' && quiz.mode !== 'interactive' && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[200] pointer-events-none overflow-hidden"
+              >
+                {Array.from({ length: 25 }).map((_, i) => {
+                  const isBalloon = i % 2 === 0;
+                  const icon = isBalloon ? '🎈' : (i % 3 === 0 ? '🌟' : '⭐');
+                  const left = `${Math.random() * 100}%`;
+                  const delay = Math.random() * 0.3;
+                  const duration = 2 + Math.random() * 2;
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: '100vh', x: 0 }}
+                      animate={{ 
+                        opacity: [0, 1, 1, 0], 
+                        y: '-20vh', 
+                        x: (Math.random() - 0.5) * 200,
+                        rotate: Math.random() * 360 
+                      }}
+                      transition={{ duration, delay, ease: "easeOut" }}
+                      className="absolute text-5xl md:text-7xl drop-shadow-lg"
+                      style={{ left }}
+                    >
+                      {icon}
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            )}
+
             {stage === 'reveal' && quiz.mode === 'interactive' && quiz.showBadges !== false && (() => {
               const rawAnswer = (question?.correctAnswer || question?.answer || question?.word || question?.correct_answer || question?.brand_name || '').toString().trim();
               const clicked = (interactiveOptionClicked || '').toString().trim();
@@ -1758,10 +1945,10 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               if (!clicked) return null;
               
               let isCorrect = false;
-              if (question?.type === 'detective' || quiz.type === 'detective') {
+              if (question?.type === 'detective' || currentType === 'detective') {
                 const fakeSentence = (question.sentences && question.fakeSentenceIndex !== undefined ? question.sentences[question.fakeSentenceIndex] : '').toString().trim();
                 isCorrect = clicked.toLowerCase() === fakeSentence.toLowerCase() || (rawAnswer !== '' && clicked.toLowerCase() === rawAnswer.toLowerCase());
-              } else if (question?.type === 'match-the-following' || quiz.type === 'match-the-following' || question?.type === 'word-search' || quiz.type === 'word-search') {
+              } else if (question?.type === 'match-the-following' || currentType === 'match-the-following' || question?.type === 'word-search' || currentType === 'word-search') {
                 isCorrect = true;
               } else {
                 isCorrect = rawAnswer === '' ? true : (clicked.toLowerCase() === rawAnswer.toLowerCase());
@@ -1792,13 +1979,44 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
 
               return (
                 <motion.div
-                  initial={{ scale: 0.4, opacity: 0, y: 40 }}
-                  animate={{ scale: 1, opacity: 1, y: 0 }}
-                  exit={{ scale: 0.5, opacity: 0 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                  className="fixed inset-0 z-[200] pointer-events-none flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[200] pointer-events-none flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm overflow-hidden"
                 >
-                  <div className="bg-gradient-to-br from-amber-300 via-amber-400 to-orange-500 p-8 sm:p-10 rounded-[3rem] shadow-[0_25px_80px_rgba(245,158,11,0.7)] border-8 border-white flex flex-col items-center text-center gap-4 animate-bounce max-w-lg w-full">
+                  {/* Floating Balloons and Stars */}
+                  {Array.from({ length: 20 }).map((_, i) => {
+                    const isBalloon = i % 2 === 0;
+                    const icon = isBalloon ? '🎈' : (i % 3 === 0 ? '🌟' : '⭐');
+                    const left = `${Math.random() * 100}%`;
+                    const delay = Math.random() * 0.5;
+                    const duration = 2 + Math.random() * 2;
+                    return (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: '100vh', x: 0 }}
+                        animate={{ 
+                          opacity: [0, 1, 1, 0], 
+                          y: '-20vh', 
+                          x: (Math.random() - 0.5) * 200,
+                          rotate: Math.random() * 360 
+                        }}
+                        transition={{ duration, delay, ease: "easeOut" }}
+                        className="absolute text-5xl md:text-7xl drop-shadow-lg"
+                        style={{ left }}
+                      >
+                        {icon}
+                      </motion.div>
+                    );
+                  })}
+
+                  <motion.div
+                    initial={{ scale: 0.4, opacity: 0, y: 40 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.5, opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                    className="bg-gradient-to-br from-amber-300 via-amber-400 to-orange-500 p-8 sm:p-10 rounded-[3rem] shadow-[0_25px_80px_rgba(245,158,11,0.7)] border-8 border-white flex flex-col items-center text-center gap-4 animate-bounce max-w-lg w-full relative z-10"
+                  >
                     {playerPhoto ? (
                       <div className="relative -mt-14">
                         <img src={playerPhoto} alt={playerName} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-xl" />
@@ -1821,13 +2039,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       <span className="text-white/60">|</span>
                       <span className="text-white">{activeTopic}</span>
                     </div>
-                  </div>
+                  </motion.div>
                 </motion.div>
               );
             })()}
           <motion.div
             key={`q-container-inner-${currentQuestionIndex}`}
-            className={`${quiz.mode === 'interactive' ? 'w-[calc(100%-16rem)] sm:w-[calc(100%-18rem)] md:w-[calc(100%-22rem)] lg:w-[calc(100%-25rem)] ml-2 sm:ml-4 md:ml-8 mr-auto justify-center' : 'w-[90vw] mx-auto'} max-w-[1800px] h-full flex flex-col z-10 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' ? 'p-4 md:p-6' : 'p-8 md:p-12'}`}
+            className={`${quiz.mode === 'interactive' ? 'w-[calc(100%-16rem)] sm:w-[calc(100%-18rem)] md:w-[calc(100%-22rem)] lg:w-[calc(100%-25rem)] ml-2 sm:ml-4 md:ml-8 mr-auto justify-center' : 'w-[90vw] mx-auto'} max-w-[1800px] h-full flex flex-col z-10 ${currentType === '5-clues' || currentType === 'detective' || currentType === 'find-in-map' ? 'p-4 md:p-6' : 'p-8 md:p-12'}`}
           >
             {/* Top Bar */}
             {/* Milestone Progress Bar */}
@@ -1835,7 +2053,10 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               const totalQ = quiz.questions.length || 1;
               const maxBadges = Math.min(4, Math.max(1, Math.ceil(totalQ / 5)));
               const badgeInterval = Math.max(5, Math.ceil(totalQ / maxBadges));
-              const earnedCount = Math.min(maxBadges, Math.floor(currentQuestionIndex / badgeInterval));
+              
+              const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
+              const numAnswered = isInteractiveGrid ? answeredQuestions.size : currentQuestionIndex;
+              const earnedCount = Math.min(maxBadges, Math.floor(numAnswered / badgeInterval));
 
               return (
                 <div className="w-full mb-6 mt-2">
@@ -1846,8 +2067,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden relative shadow-inner">
                     <motion.div 
                       className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-300 to-yellow-500"
-                      initial={{ width: `${(Math.max(0, currentQuestionIndex) / totalQ) * 100}%` }}
-                      animate={{ width: `${((currentQuestionIndex + (stage === 'reveal' ? 1 : 0)) / totalQ) * 100}%` }}
+                      initial={{ width: `${(Math.max(0, numAnswered) / totalQ) * 100}%` }}
+                      animate={{ width: `${((numAnswered + (stage === 'reveal' && (!isInteractiveGrid || !answeredQuestions.has(currentQuestionIndex)) ? 1 : 0)) / totalQ) * 100}%` }}
                       transition={{ duration: 0.8, ease: "easeOut" }}
                     />
                     {/* Milestone markers */}
@@ -1864,7 +2085,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             })()}
             
             {/* Top Bar */}
-            <div className={`w-full flex ${quiz.mode === 'interactive' ? 'justify-start gap-4 md:gap-6 flex-wrap' : 'justify-between'} items-center ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' ? 'mb-4 md:mb-6' : 'mb-10'}`}>
+            <div className={`w-full flex ${quiz.mode === 'interactive' ? 'justify-start gap-4 md:gap-6 flex-wrap' : 'justify-between'} items-center ${currentType === '5-clues' || currentType === 'detective' || currentType === 'find-in-map' ? 'mb-4 md:mb-6' : 'mb-10'}`}>
               <div className="bg-white px-8 py-3 rounded-full shadow-2xl border-4 border-slate-100">
                 <span className="text-2xl font-black text-rose-500 tracking-wider uppercase">
                   Question {currentQuestionIndex + 1} of {quiz.questions.length}
@@ -1963,29 +2184,43 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             ) : (
               <>
-                <div className={`bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col ${quiz.mode === 'interactive' ? 'items-start text-left justify-center' : 'items-center justify-center'} border-b-[12px] border-slate-200 z-10 relative pt-16 md:pt-20 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'px-6 pb-6 md:px-8 md:pb-8 mb-6 gap-6 shrink-0' : quiz.type === 'find-in-map' ? `px-6 pb-6 md:px-8 md:pb-8 mb-6 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-6` : `px-8 pb-8 md:px-12 md:pb-12 mb-8 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-8`}`}>
+                <div className={`bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col ${quiz.mode === 'interactive' ? 'items-start text-left justify-center' : 'items-center justify-center'} border-b-[12px] border-slate-200 z-10 relative pt-16 md:pt-20 ${currentType === '5-clues' || currentType === 'detective' || currentType === 'match-the-following' || currentType === 'word-search' ? 'px-6 pb-6 md:px-8 md:pb-8 mb-6 gap-6 shrink-0' : currentType === 'find-in-map' ? `px-6 pb-6 md:px-8 md:pb-8 mb-6 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-6` : `px-8 pb-8 md:px-12 md:pb-12 mb-8 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-8`}`}>
                   
 
 
-              <div className={`flex flex-col md:flex-row items-center ${quiz.mode === 'interactive' ? 'justify-start text-left' : 'justify-center'} w-full ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'gap-8' : 'gap-12'}`}>
-                {question.imageUrl && !imageError && quiz.type !== 'find-in-map' && (
+              <div className={`flex flex-col md:flex-row items-center ${quiz.mode === 'interactive' ? 'justify-start text-left' : 'justify-center'} w-full ${currentType === '5-clues' || currentType === 'detective' || currentType === 'find-in-map' || currentType === 'match-the-following' || currentType === 'word-search' ? 'gap-8' : 'gap-12'}`}>
+                {((question.imageUrl && !imageError) || uploadedImages[currentQuestionIndex] || (quiz.mode === 'interactive' && isImageQuestion)) && currentType !== 'find-in-map' && (
                   <div className={
-                    (question.type?.toLowerCase() === 'identify' || quiz.type?.toLowerCase() === 'identify' || quiz.type === 'identify-image' || quiz.topic?.toLowerCase().startsWith('identify'))
-                      ? "w-full max-w-4xl h-[40vh] md:h-[500px] rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 mx-0"
-                      : `shrink-0 rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'w-40 h-40 md:w-48 md:h-48' : 'w-48 h-48 md:w-72 md:h-72'}`
+                    isImageQuestion
+                      ? "w-full max-w-4xl h-[40vh] md:h-[500px] rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 mx-0 relative group"
+                      : `shrink-0 rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 relative group ${currentType === '5-clues' || currentType === 'detective' || currentType === 'match-the-following' || currentType === 'word-search' ? 'w-40 h-40 md:w-48 md:h-48' : 'w-48 h-48 md:w-72 md:h-72'}`
                   }>
-                    <img 
-                      src={question.imageUrl} 
-                      alt="Identify this" 
-                      className="w-full h-full object-contain bg-slate-50" 
-                      crossOrigin="anonymous"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => { if (question.imagePreviewUrl && e.currentTarget.src !== question.imagePreviewUrl) { e.currentTarget.src = question.imagePreviewUrl; } else { setImageError(true); } }}
-                    />
+                    {uploadedImages[currentQuestionIndex] || (question.imageUrl && !imageError) ? (
+                      <img 
+                        src={uploadedImages[currentQuestionIndex] || question.imageUrl} 
+                        alt="Identify this" 
+                        className="w-full h-full object-contain bg-slate-50" 
+                        crossOrigin="anonymous"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => { if (question.imagePreviewUrl && e.currentTarget.src !== question.imagePreviewUrl) { e.currentTarget.src = question.imagePreviewUrl; } else { setImageError(true); } }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
+                        <ImageIcon className="w-16 h-16 mb-4 opacity-50" />
+                        <span className="text-sm font-semibold">No Image</span>
+                      </div>
+                    )}
+                    {quiz.mode === 'interactive' && (
+                      <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white cursor-pointer transition-opacity z-10">
+                        <Upload className="w-12 h-12 mb-2" />
+                        <span className="font-bold">Upload Image</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                      </label>
+                    )}
                   </div>
                 )}
-                {(quiz.isOfflineMode || !(question.type?.toLowerCase() === 'identify' || quiz.type?.toLowerCase() === 'identify' || quiz.type === 'identify-image' || quiz.topic?.toLowerCase().startsWith('identify'))) && (
-                  <h2 className={`font-extrabold text-slate-800 ${quiz.mode === 'interactive' ? 'text-left' : 'text-center'} leading-tight drop-shadow-sm flex-1 ${quiz.type === '5-clues' || quiz.type === 'detective' || quiz.type === 'find-in-map' || isJumbledLetters || quiz.type === 'match-the-following' || quiz.type === 'word-search' ? 'text-4xl md:text-5xl lg:text-6xl' : 'text-5xl md:text-6xl lg:text-7xl'}`}>
+                {(quiz.isOfflineMode || !isImageQuestion) && (
+                  <h2 className={`font-extrabold text-slate-800 ${quiz.mode === 'interactive' ? 'text-left' : 'text-center'} leading-tight drop-shadow-sm flex-1 ${currentType === '5-clues' || currentType === 'detective' || currentType === 'find-in-map' || isJumbledLetters || currentType === 'match-the-following' || currentType === 'word-search' ? 'text-4xl md:text-5xl lg:text-6xl' : 'text-5xl md:text-6xl lg:text-7xl'}`}>
                     {question.question || 'Unjumble the word!'}
                   </h2>
                 )}
@@ -2017,13 +2252,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 </div>
               )}
               
-              {quiz.type === 'find-in-map' && (
+              {currentType === 'find-in-map' && (
                 <div className="w-full flex-1 min-h-[300px] max-h-[60vh] shrink-0 mt-4 rounded-3xl overflow-hidden relative">
                   <MapQuestion question={question} timeLeft={timeLeft} />
                 </div>
               )}
               
-              {quiz.type === '5-clues' && question.options && (
+              {currentType === '5-clues' && question.options && (
                 <div className="grid grid-cols-2 gap-4 md:gap-6 mt-4 w-full max-w-6xl">
                   {question.options.map((option, i) => {
                     const isCorrect = option === question.correctAnswer;
@@ -2109,7 +2344,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             </div>
 
             {/* Options or Clues Grid */}
-            {quiz.type === 'detective' && (
+            {currentType === 'detective' && (
               <div className="flex-1 w-full shrink-0 mb-6 flex flex-col gap-2 md:gap-3">
                 {question.sentences?.map((sentence, i) => {
                   const isFake = i === question.fakeSentenceIndex;
@@ -2218,7 +2453,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
             
-            {(quiz.type === '5-clues' || question.type === '5-clues') && !isJumbledLetters && (
+            {(currentType === '5-clues' || question.type === '5-clues') && !isJumbledLetters && (
               <div className="flex-1 w-full shrink-0 mb-6 flex flex-col gap-2 md:gap-3">
                 {question.clues?.map((clue, i) => {
                   const isVisible = i <= clueIndex || stage === 'reveal';
@@ -2249,7 +2484,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
             
-            {isJumbledLetters && (
+            {(isJumbledLetters || isImageIdentifyWithoutOptions) && (
               <div className="flex-1 w-full shrink-0 mb-6 flex flex-col gap-2 md:gap-3">
                 {question.clues?.map((clue, i) => {
                   const isVisible = i <= clueIndex || stage === 'reveal';
@@ -2323,7 +2558,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
 
-            {quiz.type === 'match-the-following' && question.pairs && (
+            {currentType === 'match-the-following' && question.pairs && (
               <div className="w-full flex-1 mb-6 flex gap-4 md:gap-8 justify-center items-stretch mt-4">
                 <div className="flex flex-col gap-3 md:gap-4 w-1/2">
                   {question.pairs.map((pair, i) => (
@@ -2342,7 +2577,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
 
-            {quiz.type === 'word-search' && question.grid && (
+            {currentType === 'word-search' && question.grid && (
               <div className="w-full flex-1 flex flex-col items-center justify-center mt-4 mb-6">
                 <div className="grid grid-cols-10 gap-1 md:gap-2 bg-indigo-100 p-3 md:p-5 rounded-3xl shadow-inner border-8 border-indigo-200">
                   {question.grid.map((row, r) => (
@@ -2373,7 +2608,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
 
-            {(quiz.type === 'text-presentation' || question.type === 'text-presentation') && !isJumbledLetters && (
+            {(currentType === 'text-presentation' || question.type === 'text-presentation') && !isJumbledLetters && (
               <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto mt-4 mb-4">
                 {question.clues?.map((clue, idx) => (
                   <AnimatePresence key={idx}>
@@ -2393,7 +2628,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
 
-            {!isJumbledLetters && quiz.type !== 'text-presentation' && quiz.type !== '5-clues' && quiz.type !== 'detective' && quiz.type !== 'jumbled-letters' && quiz.type !== 'match-the-following' && quiz.type !== 'word-search' && (
+            {!isJumbledLetters && currentType !== 'text-presentation' && currentType !== '5-clues' && currentType !== 'detective' && currentType !== 'jumbled-letters' && currentType !== 'match-the-following' && currentType !== 'word-search' && (
               <div className={`flex flex-col w-full ${quiz.mode === 'interactive' ? 'items-start text-left' : 'items-center'}`}>
                 <div className={`grid grid-cols-1 ${quiz.mode === 'interactive' ? 'lg:grid-cols-2' : 'md:grid-cols-2'} gap-6 w-full shrink-0 mb-6`}>
                   {question.options?.map((option, i) => {
@@ -2659,7 +2894,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
 
         
         {stage === 'video-badges' && (() => {
-          const numAnswered = (quiz.mode === 'interactive' && quiz.type !== 'combat-mode')
+          const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
+          const numAnswered = isInteractiveGrid 
             ? answeredQuestions.size 
             : currentQuestionIndex + 1;
             
