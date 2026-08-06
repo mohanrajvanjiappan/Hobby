@@ -10,6 +10,17 @@ interface SetupProps {
   onQuizGenerated: (quiz: Quiz) => void;
 }
 
+interface UploadedFileItem {
+  id: string;
+  fileName: string;
+  fileType: 'json' | 'image';
+  title?: string;
+  topic?: string;
+  type?: string;
+  questions: any[];
+  quotes?: any[];
+}
+
 export default function Setup({ onQuizGenerated }: SetupProps) {
   const [topic, setTopic] = useState('');
   const [numQuestions, setNumQuestions] = useState(5);
@@ -23,6 +34,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
   const [caching, setCaching] = useState(false);
   const [cacheSuccess, setCacheSuccess] = useState(false);
   const [loadedOfflineQuiz, setLoadedOfflineQuiz] = useState<Quiz | null>(null);
+  const [uploadedFileList, setUploadedFileList] = useState<UploadedFileItem[]>([]);
   const [pendingInteractiveQuiz, setPendingInteractiveQuiz] = useState<Quiz | null>(null);
   const [teamName, setTeamName] = useState('');
   const [numPlayers, setNumPlayers] = useState(1);
@@ -378,6 +390,27 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
           timeLimit: 10
         }
       ];
+    } else if (quizType === 'rapid-fire') {
+      title = "Offline Rapid Fire";
+      finalType = "rapid-fire";
+      dlName = "rapid-fire";
+      questions = [
+        {
+          question: "What is 2 + 2?",
+          options: ["3", "4", "5", "6"],
+          correctAnswer: "4"
+        },
+        {
+          question: "What is the capital of France?",
+          options: ["London", "Paris", "Berlin", "Rome"],
+          correctAnswer: "Paris"
+        },
+        {
+          question: "Which planet is known as the Red Planet?",
+          options: ["Earth", "Mars", "Jupiter", "Saturn"],
+          correctAnswer: "Mars"
+        }
+      ];
     } else if (quizType === 'mega-quiz') {
       title = "Offline Mega Quiz";
       finalType = "mega-quiz";
@@ -425,6 +458,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
       title,
       topic: "Custom Topic",
       type: finalType,
+      ...(finalType === 'rapid-fire' ? { timeLimit: 60 } : {}),
       theme: {
         primaryColor: "#4f46e5",
         secondaryColor: "#818cf8",
@@ -447,126 +481,310 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
     URL.revokeObjectURL(url);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files: File[] = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    try {
-      let combinedQuestions: any[] = [];
-      let combinedQuotes: any[] = [];
-      let firstTitle = '';
-      let firstTopic = '';
-      let firstType = '';
-
-      const imageFiles = files.filter(f => f.type.startsWith('image/'));
-      const jsonFiles = files.filter(f => f.name.endsWith('.json'));
-
-      if (imageFiles.length > 0) {
-        if (!firstTitle) firstTitle = "Combined Quiz";
-        if (!firstTopic) firstTopic = "Multiple Categories";
-        if (!firstType) firstType = "identify-image";
-
-        for (const file of imageFiles) {
-          const base64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target?.result as string);
-            reader.readAsDataURL(file);
-          });
-          const name = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
-          combinedQuestions.push({
-            question: "Identify this",
-            correctAnswer: name,
-            answer: name,
-            type: "identify-image",
-            category: "Identify the Image",
-            imageUrl: base64,
-            imagePreviewUrl: base64,
-            options: []
-          });
-        }
-      }
-
-      for (const file of jsonFiles) {
-        const fallbackCategory = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+  const parseFile = async (file: File): Promise<UploadedFileItem | null> => {
+    const fileId = Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+    if (file.type.startsWith('image/')) {
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.readAsDataURL(file);
+      });
+      const name = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
+      return {
+        id: fileId,
+        fileName: file.name,
+        fileType: 'image',
+        questions: [{
+          question: "Identify this",
+          correctAnswer: name,
+          answer: name,
+          type: "identify-image",
+          category: "Identify the Image",
+          imageUrl: base64,
+          imagePreviewUrl: base64,
+          options: []
+        }]
+      };
+    } else if (file.name.endsWith('.json') || file.type.includes('json')) {
+      try {
         const text = await file.text();
+        const fallbackCategory = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
         const json = JSON.parse(text);
-        // Fetch category from top-level title field if available
+
+        let parsedQuestions: any[] = [];
+        let parsedQuotes: any[] = [];
+        let title = '';
+        let topic = '';
+        let type = '';
+
         const fileCategory = (json && !Array.isArray(json) && json.title)
           ? json.title
           : ((json && !Array.isArray(json) && json.topic) ? json.topic : fallbackCategory);
 
         if (Array.isArray(json)) {
-          const items = json.map(item => ({
+          parsedQuestions = json.map((item: any) => ({
             ...item,
             correctAnswer: item.correctAnswer || item.answer || item.word || item.correct_answer || item.brand_name || '',
-            type: item.type || (firstType !== 'identify-image' ? firstType : 'multiple-choice'),
+            type: item.type || 'multiple-choice',
             category: item.category || fileCategory
           }));
-          combinedQuestions.push(...items);
         } else if (json && json.questions && Array.isArray(json.questions)) {
-          if (!firstTitle) firstTitle = json.title || json.topic;
-          if (!firstTopic) firstTopic = json.topic;
-          if (!firstType) firstType = json.type;
-
+          title = json.title || '';
+          topic = json.topic || '';
+          type = json.type || '';
           if (json.quotes && Array.isArray(json.quotes)) {
-            combinedQuotes.push(...json.quotes);
+            parsedQuotes = json.quotes;
           }
-
-          const questionsWithCategory = json.questions.map((q: any) => ({
+          parsedQuestions = json.questions.map((q: any) => ({
             ...q,
             correctAnswer: q.correctAnswer || q.answer || q.word || q.correct_answer || q.brand_name || '',
-            type: q.type || json.type || (firstType !== 'identify-image' ? firstType : 'multiple-choice'),
+            type: q.type || json.type || 'multiple-choice',
             category: q.category || fileCategory
           }));
-          combinedQuestions.push(...questionsWithCategory);
         } else {
-          console.warn(`Skipping invalid JSON in ${file.name}`);
+          return null;
+        }
+
+        parsedQuestions = parsedQuestions.map(q => {
+          if (q.wordsToFind && (!q.grid || !q.wordLocations)) {
+            const { grid, wordLocations, wordsToFind } = generateWordSearchGrid(q.wordsToFind);
+            return { ...q, grid, wordLocations, wordsToFind };
+          }
+          return q;
+        });
+
+        return {
+          id: fileId,
+          fileName: file.name,
+          fileType: 'json',
+          title,
+          topic,
+          type,
+          questions: parsedQuestions,
+          quotes: parsedQuotes
+        };
+      } catch (err) {
+        console.error("Error parsing JSON file:", file.name, err);
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files: File[] = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    try {
+      const newItems: UploadedFileItem[] = [];
+      let invalidCount = 0;
+
+      for (const file of files) {
+        const item = await parseFile(file);
+        if (item && item.questions.length > 0) {
+          newItems.push(item);
+        } else {
+          invalidCount++;
         }
       }
 
-      if (combinedQuestions.length === 0) {
-        setError("Invalid JSON format. Expected an array or a Quiz object with a 'questions' array.");
-        return;
+      if (newItems.length > 0) {
+        setUploadedFileList(prev => [...prev, ...newItems]);
+        setError('');
       }
 
-      combinedQuestions = combinedQuestions.map(q => {
-        if (q.wordsToFind && (!q.grid || !q.wordLocations)) {
-          const { grid, wordLocations, wordsToFind } = generateWordSearchGrid(q.wordsToFind);
-          return { ...q, grid, wordLocations, wordsToFind };
-        }
-        return q;
-      });
-
-      // Prime speech synthesis
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance('');
-        utterance.volume = 0;
-        window.speechSynthesis.speak(utterance);
+      if (invalidCount > 0 && newItems.length === 0) {
+        setError("Invalid file format. Expected JSON files with quiz questions or image files.");
       }
-      audioSynth.setVoicePreference(voicePreference);
-      audioSynth.setMusicPreference(musicEnabled);
-
-      const combinedQuiz: Quiz = {
-        title: files.length > 1 ? (firstTitle || "Combined Quiz") : (firstTitle || files[0].name.replace(/\.[^/.]+$/, "")),
-        topic: firstTopic || (files.length > 1 ? "Multiple JSON Files" : files[0].name.replace(/\.[^/.]+$/, "")),
-        type: (firstType as any) || "multiple-choice",
-        theme: {
-          primaryColor: "#4f46e5",
-          secondaryColor: "#818cf8",
-          textColor: "#ffffff"
-        },
-        questions: combinedQuestions,
-        quotes: combinedQuotes.length > 0 ? combinedQuotes : undefined,
-        isOfflineMode: true,
-        isMultipleFilesLoaded: files.length > 1,
-      };
-
-      setLoadedOfflineQuiz(combinedQuiz);
-      setError('');
     } catch (err) {
-      setError("Error parsing JSON file(s). Please ensure valid JSON formatting.");
+      setError("Error parsing JSON/Image file(s). Please ensure valid formatting.");
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const combineUploadedFiles = (fileList: UploadedFileItem[]) => {
+    const jsonItems = fileList.filter(item => item.fileType === 'json');
+    const imageItems = fileList.filter(item => item.fileType === 'image');
+
+    const matchedImageIds = new Set<string>();
+
+    const norm = (s?: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const jsonItemsCloned = jsonItems.map(item => ({
+      ...item,
+      questions: item.questions.map(q => ({ ...q }))
+    }));
+
+    for (const imgItem of imageItems) {
+      const rawFileName = imgItem.fileName.replace(/\.[^/.]+$/, "");
+
+      const match = rawFileName.match(/^(.*?)[_\s-]*q?(?:uestion)?[_\s-]*0*(\d+)$/i);
+      let imgPrefix = rawFileName;
+      let serialNum: number | null = null;
+      if (match) {
+        imgPrefix = match[1];
+        serialNum = parseInt(match[2], 10);
+      }
+
+      const normPrefix = norm(imgPrefix);
+      const normRawName = norm(rawFileName);
+
+      if (!normPrefix && !normRawName) continue;
+
+      let targetJsonItem: (typeof jsonItemsCloned)[0] | null = null;
+
+      for (const jItem of jsonItemsCloned) {
+        const normTopic = norm(jItem.topic);
+        const normTitle = norm(jItem.title);
+        const normFile = norm(jItem.fileName.replace(/\.[^/.]+$/, ""));
+
+        const isMatch = 
+          (normTopic && normPrefix === normTopic) ||
+          (normTitle && normPrefix === normTitle) ||
+          (normFile && normPrefix === normFile) ||
+          (normTopic && (normTopic.startsWith(normPrefix) || normPrefix.startsWith(normTopic)) && normPrefix.length >= 3) ||
+          (normTitle && (normTitle.startsWith(normPrefix) || normPrefix.startsWith(normTitle)) && normPrefix.length >= 3) ||
+          (normTopic && normRawName.startsWith(normTopic)) ||
+          (normTitle && normRawName.startsWith(normTitle));
+
+        if (isMatch) {
+          targetJsonItem = jItem;
+          break;
+        }
+      }
+
+      if (targetJsonItem && targetJsonItem.questions.length > 0) {
+        const questions = targetJsonItem.questions;
+        let targetQ: any = null;
+
+        if (serialNum !== null) {
+          targetQ = questions.find((q: any) => 
+            q.id == serialNum || 
+            q.number == serialNum || 
+            q.questionNumber == serialNum || 
+            q.serialNumber == serialNum ||
+            q.qIndex == serialNum
+          );
+
+          if (!targetQ && serialNum >= 1 && serialNum <= questions.length) {
+            targetQ = questions[serialNum - 1];
+          }
+        }
+
+        if (!targetQ) {
+          targetQ = questions.find((q: any) => !q.imageUrl);
+        }
+
+        if (targetQ && imgItem.questions[0]?.imageUrl) {
+          const imgData = imgItem.questions[0].imageUrl;
+          targetQ.imageUrl = imgData;
+          targetQ.imagePreviewUrl = imgData;
+          if (!targetQ.type || targetQ.type === 'multiple-choice') {
+            if (!targetQ.options || targetQ.options.length === 0) {
+              targetQ.type = 'identify-image';
+            }
+          }
+          matchedImageIds.add(imgItem.id);
+        }
+      }
+    }
+
+    let combinedQuestions: any[] = [];
+    let combinedQuotes: any[] = [];
+    let firstTitle = '';
+    let firstTopic = '';
+    let firstType = '';
+
+    let playerIdxCounter = 0;
+
+    for (const item of jsonItemsCloned) {
+      if (!firstTitle && item.title) firstTitle = item.title;
+      if (!firstTopic && item.topic) firstTopic = item.topic;
+      if (!firstType && item.type) firstType = item.type;
+
+      const questionsWithPlayerIdx = item.questions.map(q => ({
+        ...q,
+        playerIndex: firstType === 'rapid-fire' ? playerIdxCounter : undefined
+      }));
+      combinedQuestions.push(...questionsWithPlayerIdx);
+      if (firstType === 'rapid-fire') {
+        playerIdxCounter++;
+      }
+      if (item.quotes && item.quotes.length > 0) {
+        combinedQuotes.push(...item.quotes);
+      }
+    }
+
+    for (const item of imageItems) {
+      if (!matchedImageIds.has(item.id)) {
+        if (!firstTitle && item.title) firstTitle = item.title;
+        if (!firstTopic && item.topic) firstTopic = item.topic;
+        if (!firstType && item.type) firstType = item.type;
+
+        combinedQuestions.push(...item.questions);
+      }
+    }
+
+    return {
+      combinedQuestions,
+      combinedQuotes,
+      firstTitle,
+      firstTopic,
+      firstType,
+      matchedCount: matchedImageIds.size
+    };
+  };
+
+  const handleStartUploadedFiles = (mode: 'select' | 'video' | 'interactive' = 'select') => {
+    if (uploadedFileList.length === 0) {
+      setError("Please select at least one JSON or image file.");
+      return;
+    }
+
+    const {
+      combinedQuestions,
+      combinedQuotes,
+      firstTitle,
+      firstTopic,
+      firstType
+    } = combineUploadedFiles(uploadedFileList);
+
+    if (combinedQuestions.length === 0) {
+      setError("No valid questions found in uploaded files.");
+      return;
+    }
+
+    // Prime speech synthesis
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance('');
+      utterance.volume = 0;
+      window.speechSynthesis.speak(utterance);
+    }
+    audioSynth.setVoicePreference(voicePreference);
+    audioSynth.setMusicPreference(musicEnabled);
+
+    const combinedQuiz: Quiz = {
+      title: firstTitle || (uploadedFileList.length === 1 ? uploadedFileList[0].fileName.replace(/\.[^/.]+$/, "") : "Combined Quiz"),
+      topic: firstTopic || (uploadedFileList.length === 1 ? uploadedFileList[0].fileName.replace(/\.[^/.]+$/, "") : "Uploaded Files"),
+      type: (firstType as any) || "multiple-choice",
+      theme: {
+        primaryColor: "#4f46e5",
+        secondaryColor: "#818cf8",
+        textColor: "#ffffff"
+      },
+      questions: combinedQuestions,
+      quotes: combinedQuotes.length > 0 ? combinedQuotes : undefined,
+      isOfflineMode: true,
+      isMultipleFilesLoaded: uploadedFileList.length > 1,
+    };
+
+    if (mode === 'video') {
+      onQuizGenerated({ ...combinedQuiz, mode: 'video', showBadges, rules: rules || undefined });
+    } else if (mode === 'interactive') {
+      setPendingInteractiveQuiz({ ...combinedQuiz, mode: 'interactive', showBadges, rules: rules || undefined });
+    } else {
+      setLoadedOfflineQuiz(combinedQuiz);
+    }
   };
 
   
@@ -925,6 +1143,27 @@ return (
                   isMultiplayer: numPlayers > 1,
                   players: players.map((p, i) => ({ ...p, name: p.name || `Player ${i + 1}` }))
                 };
+                
+                if (finalQuiz.type === 'rapid-fire' && finalQuiz.isMultiplayer) {
+                  const uniquePlayerIndices = new Set(finalQuiz.questions.map((q: any) => q.playerIndex).filter((i: number | undefined) => i !== undefined));
+                  if (uniquePlayerIndices.size <= 1) {
+                    const totalQ = finalQuiz.questions.length;
+                    const numP = finalQuiz.players.length;
+                    const qPerPlayer = Math.floor(totalQ / numP);
+                    if (qPerPlayer > 0) {
+                      finalQuiz.questions = finalQuiz.questions.slice(0, qPerPlayer * numP).map((q: any, idx: number) => ({
+                        ...q,
+                        playerIndex: Math.floor(idx / qPerPlayer)
+                      }));
+                    } else {
+                      finalQuiz.questions = finalQuiz.questions.map((q: any, idx: number) => ({
+                        ...q,
+                        playerIndex: idx
+                      }));
+                    }
+                  }
+                }
+                
                 audioSynth.setVoicePreference('none');
                 onQuizGenerated(finalQuiz);
               }}
@@ -989,6 +1228,7 @@ return (
               <option value="combat-mode">Combat Mode (2 Players)</option>
               <option value="word-search">Word Search</option>
               <option value="mega-quiz">Mega Quiz (100 Questions Mix)</option>
+              <option value="rapid-fire">Rapid Fire</option>
             </select>
           </div>
 
@@ -1376,19 +1616,75 @@ return (
 
           <div className="pt-6 border-t border-neutral-100 flex flex-col gap-3">
             <p className="text-sm font-semibold text-neutral-500 text-center mb-1">OR USE OFFLINE MODE</p>
-            <div className="flex gap-3">
+
+            {uploadedFileList.length > 0 && (
+              <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 space-y-3 text-left">
+                <div className="flex items-center justify-between text-xs font-bold text-indigo-900 uppercase tracking-wider">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Selected Files ({uploadedFileList.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setUploadedFileList([])}
+                    className="text-red-500 hover:text-red-700 font-semibold lowercase text-xs transition-colors"
+                  >
+                    Clear all
+                  </button>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                  {uploadedFileList.map((item) => {
+                    const totalQ = item.questions.length;
+                    return (
+                      <div key={item.id} className="flex items-center justify-between bg-white px-3 py-2.5 rounded-xl border border-indigo-100 text-xs shadow-xs">
+                        <div className="flex items-center gap-2 overflow-hidden mr-2">
+                          {item.fileType === 'json' ? (
+                            <FileText className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                          ) : (
+                            <ImageIcon className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                          )}
+                          <span className="font-bold text-slate-800 truncate max-w-[150px]" title={item.fileName}>
+                            {item.fileName}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex-shrink-0">
+                            {totalQ} {totalQ === 1 ? 'question' : 'questions'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setUploadedFileList(prev => prev.filter(f => f.id !== item.id))}
+                          className="text-slate-400 hover:text-red-500 p-1 rounded-lg hover:bg-red-50 transition-colors"
+                          title="Remove file"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="text-xs font-semibold text-indigo-800 flex justify-between items-center pt-2 border-t border-indigo-100">
+                  <span>Total Questions: <strong>{uploadedFileList.reduce((sum, item) => sum + item.questions.length, 0)}</strong></span>
+                  <span className="text-[11px] text-indigo-600 font-medium">Add more files or start below</span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
                 onClick={downloadTemplate}
-                className="flex-1 py-3 px-4 rounded-xl bg-white border-2 border-indigo-100 text-indigo-600 font-bold hover:bg-indigo-50 hover:border-indigo-200 transition-all flex items-center justify-center gap-2"
+                className="py-3 px-3 rounded-xl bg-white border-2 border-indigo-100 text-indigo-600 font-bold text-sm hover:bg-indigo-50 hover:border-indigo-200 transition-all flex items-center justify-center gap-1.5"
+                title="Download JSON template"
               >
-                <Download className="w-5 h-5" />
+                <Download className="w-4 h-4" />
                 Template
               </button>
               
-              <label className="flex-1 py-3 px-4 rounded-xl bg-white border-2 border-indigo-100 text-indigo-600 font-bold hover:bg-indigo-50 hover:border-indigo-200 transition-all flex items-center justify-center gap-2 cursor-pointer">
-                <Upload className="w-5 h-5" />
-                Upload JSON & Image(s)
+              <label className="flex-1 py-3 px-3 rounded-xl bg-white border-2 border-indigo-100 text-indigo-600 font-bold text-sm hover:bg-indigo-50 hover:border-indigo-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center">
+                <Upload className="w-4 h-4 flex-shrink-0" />
+                <span>{uploadedFileList.length > 0 ? "Add More Files" : "Upload JSON & Image(s)"}</span>
                 <input
                   type="file"
                   accept=".json,image/*"
@@ -1398,6 +1694,17 @@ return (
                   onChange={handleFileUpload}
                 />
               </label>
+
+              {uploadedFileList.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleStartUploadedFiles('select')}
+                  className="py-3 px-4 rounded-xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  Start Quiz
+                </button>
+              )}
             </div>
           </div>
         </form>

@@ -1,0 +1,1 @@
+const currentType = "identify-image"

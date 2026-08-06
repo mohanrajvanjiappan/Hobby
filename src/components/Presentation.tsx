@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Quiz } from '../types';
 import { audioSynth } from '../lib/audio';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload } from 'lucide-react';
+import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload, RotateCcw } from 'lucide-react';
 import quizLogo from '../assets/images/quiz_logo_1783447286811.jpg';
 import MapQuestion from './MapQuestion';
 
@@ -12,7 +12,7 @@ interface PresentationProps {
   onExit: () => void;
 }
 
-type Stage = 'intro' | 'multiplayer-intro' | 'rules' | 'warmup' | 'countdown' | 'category-selection' | 'question-selection' | 'question' | 'reveal' | 'quote' | 'score' | 'badges' | 'talk' | 'celebrate' | 'outro' | 'video-badges';
+type Stage = 'intro' | 'player-intro' | 'multiplayer-intro' | 'rules' | 'warmup' | 'countdown' | 'category-selection' | 'question-selection' | 'question' | 'reveal' | 'quote' | 'score' | 'badges' | 'talk' | 'celebrate' | 'outro' | 'video-badges';
 
 const OUTRO_MESSAGES = [
   {
@@ -244,6 +244,7 @@ const ParticipantVideoFrames: React.FC<ParticipantVideoFramesProps> = ({
 
 export default function Presentation({ quiz, onExit }: PresentationProps) {
   const [stage, setStage] = useState<Stage>('intro');
+  const [introducingPlayerIndex, setIntroducingPlayerIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [clueIndex, setClueIndex] = useState(0);
@@ -269,6 +270,94 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
     quiz.topic === "Multiple JSON Files" ||
     (false)
   ), [quiz.isMultipleFilesLoaded, categories.length, quiz.topic, quiz.title]);
+
+  const celebrationPlayers = useMemo(() => {
+    if (!playersState || playersState.length === 0) {
+      return [{ id: 'p1', name: quiz.teamName || 'Player 1', score: score || 0, photo: quiz.playerPhoto || '' }];
+    }
+    // Sort lowest score to highest score
+    return [...playersState].sort((a, b) => (a.score || 0) - (b.score || 0));
+  }, [playersState, quiz.teamName, quiz.playerPhoto, score]);
+
+  const getCelebrationFrame = useCallback((rank: number, totalPlayers: number, playerName: string, scoreVal: number) => {
+    if (totalPlayers === 1) {
+      return {
+        rank: 1,
+        rankTitle: "🌟 Quiz Star Celebration!",
+        badgeText: "🌟 Outstanding Performance!",
+        badgeBg: "from-amber-400 via-yellow-500 to-amber-600",
+        speech: `Let's celebrate ${playerName}! Fantastic job scoring ${scoreVal} points! You did an amazing job!`,
+        crownIcon: "👑",
+        awards: [
+          { title: "Champion Cup", icon: Trophy, bg: "from-yellow-400 to-amber-600", desc: "Top Performance" },
+          { title: "Master Medal", icon: Award, bg: "from-emerald-400 to-teal-600", desc: "Quiz Whiz" },
+          { title: "Mystery Box", icon: Gift, bg: "from-purple-500 to-pink-600", desc: "Bonus Rewards" }
+        ]
+      };
+    }
+
+    if (rank === 1) {
+      return {
+        rank: 1,
+        rankTitle: "👑 1st Place - Grand Champion!",
+        badgeText: "🏆 Ultimate Winner & Gold Champion",
+        badgeBg: "from-amber-300 via-yellow-400 to-amber-600",
+        speech: `And in 1st place... taking the crown as our Grand Champion with ${scoreVal} points... Huge congratulations to ${playerName}! You ruled the quiz today!`,
+        crownIcon: "👑 🥇",
+        awards: [
+          { title: "Golden Trophy", icon: Trophy, bg: "from-yellow-400 via-amber-500 to-yellow-600", desc: "1st Place Champion" },
+          { title: "Crown of Victory", icon: Crown, bg: "from-amber-300 via-yellow-400 to-amber-500", desc: "Ultimate Ruler" },
+          { title: "Gold Medal", icon: Medal, bg: "from-yellow-500 via-amber-600 to-yellow-700", desc: "Grand Master" }
+        ]
+      };
+    }
+
+    if (rank === 2) {
+      return {
+        rank: 2,
+        rankTitle: "🥈 2nd Place - Silver Medalist!",
+        badgeText: "⭐ Outstanding Runner-Up",
+        badgeBg: "from-slate-200 via-slate-300 to-slate-500",
+        speech: `In 2nd place with an impressive score of ${scoreVal} points... Give a big round of applause for ${playerName}! An outstanding performance!`,
+        crownIcon: "🥈",
+        awards: [
+          { title: "Silver Cup", icon: Trophy, bg: "from-slate-300 via-slate-400 to-slate-600", desc: "2nd Place Excellence" },
+          { title: "Silver Medal", icon: Medal, bg: "from-slate-200 via-slate-300 to-slate-500", desc: "Runner-Up Medal" },
+          { title: "Star Performer", icon: Star, bg: "from-blue-400 via-indigo-500 to-purple-600", desc: "High Scorer" }
+        ]
+      };
+    }
+
+    if (rank === 3) {
+      return {
+        rank: 3,
+        rankTitle: "🥉 3rd Place - Bronze Star!",
+        badgeText: "🥉 Great Game & High Spirit",
+        badgeBg: "from-amber-700 via-orange-800 to-amber-900",
+        speech: `In 3rd place with a great score of ${scoreVal} points... Let's hear it for ${playerName}! Fantastic playing and super sportsmanship!`,
+        crownIcon: "🥉",
+        awards: [
+          { title: "Bronze Shield", icon: Award, bg: "from-amber-700 via-orange-800 to-amber-900", desc: "3rd Place Honor" },
+          { title: "Bronze Medal", icon: Medal, bg: "from-orange-600 via-amber-700 to-orange-800", desc: "Bronze Star" },
+          { title: "Super Player", icon: Sparkles, bg: "from-teal-400 via-emerald-500 to-teal-700", desc: "Great Effort" }
+        ]
+      };
+    }
+
+    return {
+      rank,
+      rankTitle: `${rank}th Place - Great Effort!`,
+      badgeText: `🌟 ${rank}th Place Participant`,
+      badgeBg: "from-indigo-500 to-purple-600",
+      speech: `In ${rank}th place with ${scoreVal} points... Let's give it up for ${playerName}! Fantastic effort today!`,
+      crownIcon: "🏅",
+      awards: [
+        { title: "Participant Badge", icon: Award, bg: "from-indigo-400 to-purple-600", desc: "Awesome Playing" },
+        { title: "Brain Booster", icon: Brain, bg: "from-purple-400 to-pink-600", desc: "Smart Effort" },
+        { title: "Quiz Explorer", icon: Rocket, bg: "from-cyan-400 to-blue-600", desc: "Great Curiosity" }
+      ]
+    };
+  }, []);
 
   const getActiveContextTopic = useCallback((qIndex?: number) => {
     const idx = qIndex !== undefined ? qIndex : currentQuestionIndex;
@@ -407,6 +496,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   }, [quiz.mode]);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const rapidFireTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const rapidFirePlayerIdxRef = useRef<number | null>(null);
 
   const outroMessage = useMemo(() => {
     if (quiz.type === 'text-presentation') {
@@ -577,11 +668,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           }
           
           const goToNext = () => {
-            const waitTime = 2000;
+            const waitTime = 1500;
             const t3 = setTimeout(() => {
               if (quiz.mode !== 'interactive') audioSynth.playSwoosh();
-              if (quiz.isMultiplayer) {
-                setStage('multiplayer-intro');
+              if (quiz.isMultiplayer || (playersState && playersState.length > 0)) {
+                setIntroducingPlayerIndex(0);
+                setStage('player-intro');
               } else if (quiz.mode === 'interactive') {
                 setStage('warmup');
               } else {
@@ -612,34 +704,92 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         window.speechSynthesis.cancel();
       };
     }
-    
-    if (stage === 'multiplayer-intro' && quiz.mode !== 'interactive') {
+
+    if (stage === 'player-intro') {
       let timeouts: NodeJS.Timeout[] = [];
-      const t1 = setTimeout(() => {
-        const names = playersState.map(p => p.name);
-        const playerNames = names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0];
-        const speech = `The challengers are ${playerNames}.`;
-        
-        const goToNext = () => {
-          const t2 = setTimeout(() => {
-            audioSynth.playSwoosh();
-            if (quiz.rules) {
-              setStage('rules');
-            } else if (categories.length > 1) {
-              setStage('category-selection');
-            } else {
-              setStage('question-selection');
+      const currentPlayer = playersState[introducingPlayerIndex];
+
+      if (!currentPlayer || introducingPlayerIndex >= playersState.length) {
+        setStage('multiplayer-intro');
+        return;
+      }
+
+      audioSynth.playSwoosh();
+      audioSynth.playHTML5Badge();
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.5 },
+        colors: ['#38bdf8', '#facc15', '#f43f5e', '#a855f7', '#34d399']
+      });
+
+      const num = introducingPlayerIndex + 1;
+      const pName = currentPlayer.name || `Player ${num}`;
+      const pTopic = currentPlayer.topic ? `, specializing in ${currentPlayer.topic}` : '';
+      const pDetails = currentPlayer.details ? `. ${currentPlayer.details}` : '';
+      const speech = `Introducing Challenger Number ${num}: ${pName}${pTopic}${pDetails}!`;
+
+      const tStart = setTimeout(() => {
+        audioSynth.speak(speech);
+      }, 400);
+      timeouts.push(tStart);
+
+      return () => {
+        timeouts.forEach(clearTimeout);
+        window.speechSynthesis.cancel();
+      };
+    }
+    
+    if (stage === 'multiplayer-intro') {
+      let timeouts: NodeJS.Timeout[] = [];
+
+      audioSynth.playVictory();
+      audioSynth.playSwoosh();
+      confetti({
+        particleCount: 120,
+        spread: 90,
+        origin: { y: 0.5 },
+        colors: ['#facc15', '#ef4444', '#3b82f6', '#10b981']
+      });
+
+      const names = playersState.map(p => p.name || 'Player');
+      const playerNames = names.length > 1 ? names.slice(0, -1).join(', ') + ' versus ' + names[names.length - 1] : names[0];
+      const speech = `The battle is set! It's ${playerNames}! Let the battle begin!`;
+
+      const goToNext = () => {
+        const t2 = setTimeout(() => {
+          audioSynth.playSwoosh();
+          if (quiz.rules) {
+            setStage('rules');
+          } else if (quiz.mode !== 'interactive' || quiz.type === 'rapid-fire' || quiz.type === 'combat-mode') {
+            if (quiz.type === 'rapid-fire') {
+              rapidFirePlayerIdxRef.current = null;
+              setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
             }
-          }, 2000);
-          timeouts.push(t2);
-        };
-        
-        audioSynth.speak(speech, goToNext);
-        const fallbackWait = Math.max(5000, (speech.length / 15) * 1000 + 2000);
-        timeouts.push(setTimeout(goToNext, fallbackWait));
-      }, 1000);
-      timeouts.push(t1);
-      
+            setStage('question');
+          } else if (categories.length > 1) {
+            setStage('category-selection');
+          } else {
+            setStage('question-selection');
+          }
+        }, 2000);
+        timeouts.push(t2);
+      };
+
+      if (quiz.mode !== 'interactive') {
+        const t1 = setTimeout(() => {
+          audioSynth.speak(speech, goToNext);
+          const fallbackWait = Math.max(5000, (speech.length / 15) * 1000 + 2000);
+          timeouts.push(setTimeout(goToNext, fallbackWait));
+        }, 400);
+        timeouts.push(t1);
+      } else {
+        const t1 = setTimeout(() => {
+          audioSynth.speak(speech);
+        }, 400);
+        timeouts.push(t1);
+      }
+
       return () => {
         timeouts.forEach(clearTimeout);
         window.speechSynthesis.cancel();
@@ -654,7 +804,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         const goToNext = () => {
           const t2 = setTimeout(() => {
             audioSynth.playSwoosh();
-            if (categories.length > 1) {
+            if (quiz.mode !== 'interactive' || quiz.type === 'rapid-fire' || quiz.type === 'combat-mode') {
+              if (quiz.type === 'rapid-fire') {
+                rapidFirePlayerIdxRef.current = null;
+                setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
+              }
+              setStage('question');
+            } else if (categories.length > 1) {
               setStage('category-selection');
             } else {
               setStage('question-selection');
@@ -875,8 +1031,74 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             return prev - 1;
           });
         }, 1000);
-      } else {
+      } else if (currentType === 'rapid-fire') {
         audioSynth.speak(question.question);
+      } else {
+        let textToSpeak = question.question;
+        if (quiz.mode === 'video' && isImageQuestion && (!question.question || question.question.toLowerCase().includes('identify the image') || question.question.toLowerCase().includes('identify this image') || question.question.toLowerCase() === 'what is this?' || question.question.toLowerCase() === 'identify this')) {
+          const topic = (quiz.topic || question.category || '').toLowerCase();
+          const isAnimal = topic.includes('animal') || topic.includes('wildlife');
+          const isFood = topic.includes('food') || topic.includes('fruit') || topic.includes('vegetable');
+          const isPlace = topic.includes('place') || topic.includes('country') || topic.includes('landmark');
+          
+          const prompts = [
+            "Can you identify what this is?",
+            "Take a close look, what do you see?",
+            "Do you know the name of this?",
+            "What is shown in this picture?",
+            "Can you guess what this image shows?",
+            "Let's see if you recognize this one.",
+            "What could this possibly be?",
+            "Any ideas on what this is called?",
+            "Have you seen this before? What is it?",
+            "Time to guess! What's in the picture?"
+          ];
+          
+          let themedPrompts = [...prompts];
+          if (isAnimal) {
+             themedPrompts = [
+               "What animal is this?",
+               "Can you name this creature?",
+               "Do you know which animal this is?",
+               "Which fascinating animal is shown here?",
+               "Can you identify this wild friend?",
+               "What species are we looking at?",
+               "Take a guess, what animal is in the picture?",
+               "Do you recognize this animal?",
+               "What is the name of this beast?",
+               "Can you tell me what animal this is?"
+             ];
+          } else if (isFood) {
+             themedPrompts = [
+               "What delicious food is this?",
+               "Can you name this dish?",
+               "Do you know what we're eating here?",
+               "What tasty treat is in the picture?",
+               "Can you identify this ingredient or food?",
+               "What is this culinary delight?",
+               "Take a guess, what food is shown?",
+               "Do you recognize this dish?",
+               "What are we cooking up here?",
+               "Can you tell me what food this is?"
+             ];
+          } else if (isPlace) {
+             themedPrompts = [
+               "What famous place is this?",
+               "Can you name this landmark?",
+               "Do you know where this is?",
+               "What location is shown in the picture?",
+               "Can you identify this monument or place?",
+               "What is this famous destination?",
+               "Take a guess, where in the world is this?",
+               "Do you recognize this beautiful spot?",
+               "What country or city could this be?",
+               "Can you tell me what landmark this is?"
+             ];
+          }
+          
+          textToSpeak = themedPrompts[currentQuestionIndex % themedPrompts.length];
+        }
+        audioSynth.speak(textToSpeak || 'Identify the image');
         setTimeLeft(question.timeLimit);
         
         timerRef.current = setInterval(() => {
@@ -903,6 +1125,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       audioSynth.stopBackgroundMusic();
       if (!(quiz.mode === 'interactive' && interactiveOptionClicked !== null)) {
         audioSynth.playCorrect();
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#38bdf8', '#facc15', '#f43f5e', '#a855f7', '#34d399']
+        });
       }
       
       let speechText = `The correct answer is ${question.correctAnswer}.`;
@@ -927,7 +1155,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         t = setTimeout(() => {
           audioSynth.playSwoosh();
           // Go to next question, or quote if it's the end
-          const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
+          const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && quiz.type !== 'rapid-fire' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
           let numAnswered = 0;
           let willComplete = false;
           
@@ -943,19 +1171,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           } else {
             numAnswered = currentQuestionIndex + 1;
             willComplete = numAnswered >= quiz.questions.length;
-            if (quiz.isMultiplayer && quiz.mode === 'interactive') {
+            if (quiz.isMultiplayer && quiz.mode === 'interactive' && quiz.type !== 'rapid-fire') {
               setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
             }
           }
           
           if (willComplete) {
-            if (quiz.mode === 'interactive') {
-              setStage('score');
-            } else if (quiz.quotes && quiz.quotes.length > 0) {
-              setStage('quote');
-            } else {
-              setStage('celebrate');
-            }
+            setStage('score');
           } else {
             const totalQ = quiz.questions.length || 1;
             const maxBadges = Math.min(4, Math.max(1, Math.ceil(totalQ / 5)));
@@ -977,11 +1199,17 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 }
               } else {
                 setCurrentQuestionIndex((prev) => prev + 1);
+                if (quiz.type === 'rapid-fire') {
+                  const nextQ = quiz.questions[currentQuestionIndex + 1];
+                  if (nextQ && nextQ.playerIndex !== undefined) {
+                    setCurrentPlayerIndex(nextQ.playerIndex);
+                  }
+                }
                 setStage('question');
               }
             }
           }
-        }, 2000);
+        }, quiz.type === 'rapid-fire' ? 200 : 2000);
       };
 
       if (quiz.mode === 'interactive' && interactiveOptionClicked !== null) {
@@ -1021,48 +1249,70 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
     
     if (stage === 'score') {
       audioSynth.playVictory();
-      audioSynth.playHTML5Badge();;
+      audioSynth.playHTML5Badge();
       
-      const fireConfetti = () => {
+      const maxPossibleScore = quiz.questions.reduce((total, q) => {
+        const qType = q.type || quiz.type;
+        let inc = (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1);
+        if (quiz.mode === 'interactive' && qType === '5-clues') {
+          inc = 10;
+        }
+        return total + inc;
+      }, 0);
+      
+      const isPerfectScore = (quiz.isMultiplayer || (playersState && playersState.length > 0))
+        ? (playersState && playersState.length > 0 && Math.max(...playersState.map(p => p.score || 0)) === maxPossibleScore && maxPossibleScore > 0)
+        : (score === maxPossibleScore && maxPossibleScore > 0);
+
+      let interval: any;
+      if (isPerfectScore) {
+        const duration = 5 * 1000;
+        const animationEnd = Date.now() + duration;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+
+        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+        interval = setInterval(function() {
+          const timeLeft = animationEnd - Date.now();
+
+          if (timeLeft <= 0) {
+            return clearInterval(interval);
+          }
+
+          const particleCount = 50 * (timeLeft / duration);
+          confetti({
+            ...defaults, particleCount,
+            origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+            colors: ['#facc15', '#f87171', '#60a5fa', '#34d399', '#a78bfa']
+          });
+          confetti({
+            ...defaults, particleCount,
+            origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+            colors: ['#facc15', '#f87171', '#60a5fa', '#34d399', '#a78bfa']
+          });
+        }, 250);
+      } else {
         confetti({
           particleCount: 150,
           spread: 80,
           origin: { y: 0.6 },
           colors: ['#facc15', '#f87171', '#60a5fa', '#34d399', '#a78bfa']
         });
-      };
-      
-      fireConfetti();
-      let confettiTimer = setTimeout(() => {
-        confetti({
-          particleCount: 100,
-          spread: 120,
-          origin: { y: 0.5 },
-          colors: ['#facc15', '#f87171', '#60a5fa', '#34d399', '#a78bfa']
-        });
-      }, 700);
+      }
 
       let t: NodeJS.Timeout;
       
-      if (quiz.isMultiplayer) {
+      if (quiz.isMultiplayer || (playersState && playersState.length > 0)) {
         const sorted = [...playersState].sort((a, b) => b.score - a.score);
         const winner = sorted[0];
-        audioSynth.speak(`Congratulations ${winner?.name}, you are the winner!`, () => {
-          t = setTimeout(() => {
-            setStage('badges');
-          }, 3500);
-        });
+        audioSynth.speak(`Congratulations ${winner?.name || 'Player 1'}, you are the winner on the final scoreboard!`);
       } else {
-        audioSynth.speak(`Great job ${quiz.teamName || 'Player 1'}, you scored ${score} out of ${quiz.questions.length}!`, () => {
-          t = setTimeout(() => {
-            setStage('badges');
-          }, 3000);
-        });
+        audioSynth.speak(`Great job ${quiz.teamName || 'Player 1'}, you scored ${score} points! Check out your final score on the scoreboard!`);
       }
       
       return () => {
         if (t) clearTimeout(t);
-        if (confettiTimer) clearTimeout(confettiTimer);
+        if (interval) clearInterval(interval);
         window.speechSynthesis.cancel();
       };
     }
@@ -1075,7 +1325,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         spread: 70,
         origin: { y: 0.6 }
       });
-      const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
+      const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && quiz.type !== 'rapid-fire' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
       const numAnswered = isInteractiveGrid 
         ? answeredQuestions.size 
         : currentQuestionIndex + 1;
@@ -1220,20 +1470,46 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
     if (stage === 'celebrate') {
       let timeoutId: NodeJS.Timeout;
       
-      if (quiz.mode !== 'interactive' || celebratingIndex >= playersState.length) {
+      const currentCelebrationPlayer = celebrationPlayers[celebratingIndex];
+      if (quiz.mode !== 'interactive' || !currentCelebrationPlayer || celebratingIndex >= celebrationPlayers.length) {
         setStage('outro');
       } else {
-        audioSynth.speak(`Let's celebrate ${playersState[celebratingIndex]?.name}! What an amazing performance. You earned these wonderful prizes!`);
+        const N = celebrationPlayers.length;
+        const currentRank = N - celebratingIndex;
+        const frame = getCelebrationFrame(currentRank, N, currentCelebrationPlayer.name, currentCelebrationPlayer.score || 0);
+
+        audioSynth.playVictory();
+        audioSynth.playHTML5Badge();
         
-        timeoutId = setTimeout(() => {
-          setCelebratingIndex(prev => prev + 1);
-        }, 60000); // 1 minute per player
+        confetti({
+          particleCount: 200,
+          spread: 120,
+          origin: { y: 0.5 },
+          colors: ['#facc15', '#f87171', '#60a5fa', '#34d399', '#a78bfa']
+        });
+
+        // Speak position speech
+        audioSynth.speak(frame.speech, () => {
+          // Increase celebration duration higher with more animation for video display!
+          timeoutId = setTimeout(() => {
+            setCelebratingIndex(prev => prev + 1);
+          }, 18000);
+        });
+
+        // Fallback wait if TTS speech doesn't trigger callback
+        const fallbackWait = 28000;
+        const fallbackTimer = setTimeout(() => {
+          if (!timeoutId) {
+            setCelebratingIndex(prev => prev + 1);
+          }
+        }, fallbackWait);
+
+        return () => {
+          if (timeoutId) clearTimeout(timeoutId);
+          if (fallbackTimer) clearTimeout(fallbackTimer);
+          window.speechSynthesis.cancel();
+        };
       }
-      
-      return () => {
-        if (timeoutId) clearTimeout(timeoutId);
-        window.speechSynthesis.cancel();
-      };
     }
 
     if (stage === 'outro') {
@@ -1243,7 +1519,65 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         audioSynth.speak(outroMessage.speech);
       }
     }
-  }, [stage, currentQuestionIndex, quiz, question, celebratingIndex]);
+  }, [stage, currentQuestionIndex, quiz, question, celebratingIndex, celebrationPlayers, getCelebrationFrame]);
+
+  // Rapid Fire Global Timer
+  useEffect(() => {
+    if (quiz.type === 'rapid-fire' && stage === 'question') {
+      const currentPlayerIdx = quiz.questions[currentQuestionIndex]?.playerIndex || 0;
+      const isNewSet = rapidFirePlayerIdxRef.current !== currentPlayerIdx;
+
+      if (isNewSet) {
+        if (rapidFireTimerRef.current) {
+          clearInterval(rapidFireTimerRef.current);
+          rapidFireTimerRef.current = null;
+        }
+
+        // Only set timeLeft if it hasn't been set yet for this player
+        setTimeLeft(quiz.timeLimit || 60);
+        rapidFirePlayerIdxRef.current = currentPlayerIdx;
+        
+        const timerId = setInterval(() => {
+          if (isPausedRef.current) return;
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              clearInterval(timerId);
+              if (rapidFireTimerRef.current === timerId) {
+                rapidFireTimerRef.current = null;
+              }
+              
+              const nextPlayerIdx = currentPlayerIdx + 1;
+              const nextIdx = quiz.questions.findIndex(q => (q.playerIndex || 0) === nextPlayerIdx);
+              
+              audioSynth.playWrong();
+              
+              if (nextIdx !== -1) {
+                setCurrentQuestionIndex(nextIdx);
+                setCurrentPlayerIndex(nextPlayerIdx);
+              } else {
+                setStage('score');
+              }
+              return 0;
+            }
+            if (prev <= 6) audioSynth.playTick();
+            return prev - 1;
+          });
+        }, 1000);
+        
+        rapidFireTimerRef.current = timerId;
+      }
+    }
+    if (stage === 'score' || stage === 'celebrate') {
+      if (rapidFireTimerRef.current) {
+        clearInterval(rapidFireTimerRef.current);
+        rapidFireTimerRef.current = null;
+      }
+    }
+    return () => {
+      // Cleanup happens when component unmounts
+      // We don't want to clear on every stage change, so we only clear on unmount or when explicitly reaching score/celebrate
+    };
+  }, [stage, quiz.type, currentQuestionIndex, quiz.timeLimit, quiz.questions]);
 
   const optionLetters = ['A', 'B', 'C', 'D'];
 
@@ -1272,6 +1606,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   };
 
   const getAwardPoints = () => {
+    if (currentType === 'rapid-fire') return 1;
     let inc = (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1);
     if (quiz.mode === 'interactive' && currentType === '5-clues') {
       inc = 10;
@@ -1293,6 +1628,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
     setInteractiveOptionClicked(isCorrect ? rawAnswer : jumbledInput);
     
     if (isCorrect) {
+      confetti({
+        particleCount: 120,
+        spread: 90,
+        origin: { y: 0.6 },
+        colors: ['#38bdf8', '#facc15', '#f43f5e', '#a855f7', '#34d399']
+      });
       setScore(s => s + getAwardPoints());
       if (quiz.isMultiplayer || (quiz.players && quiz.players.length > 0)) {
         setPlayersState(prev => {
@@ -1532,7 +1873,14 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   transition={{ type: "spring", stiffness: 200, damping: 20 }}
                   onClick={() => {
                     audioSynth.playSwoosh();
-                    if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
+                    if (quiz.mode !== 'interactive' || quiz.type === 'rapid-fire' || quiz.type === 'combat-mode') {
+                      setCurrentQuestionIndex(0);
+                      if (quiz.type === 'rapid-fire') {
+                        rapidFirePlayerIdxRef.current = null;
+                        setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
+                      }
+                      setStage('question');
+                    } else if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
                       if (categories.length > 1) {
                         setStage('category-selection');
                       } else {
@@ -1554,18 +1902,144 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         )}
 
         
+        {stage === 'player-intro' && (() => {
+          const player = playersState[introducingPlayerIndex] || { name: `Player ${introducingPlayerIndex + 1}` };
+          const totalPlayers = playersState.length || 1;
+          const playerNum = introducingPlayerIndex + 1;
+
+          return (
+            <motion.div
+              key={`player-intro-${introducingPlayerIndex}`}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
+              transition={{ duration: 0.5, ease: "easeInOut" }}
+              className="text-center p-8 max-w-5xl flex flex-col items-center justify-center h-full z-10 w-full mx-auto relative"
+            >
+              {/* Skip Button */}
+              <button
+                onClick={() => {
+                  audioSynth.playSwoosh();
+                  window.speechSynthesis.cancel();
+                  setStage('multiplayer-intro');
+                }}
+                className="absolute top-6 right-6 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white/90 hover:text-white rounded-full text-sm font-bold border border-white/20 backdrop-blur-md transition-all flex items-center gap-2 cursor-pointer z-30"
+              >
+                <span>Battle</span>
+                <Play className="w-4 h-4 fill-current" />
+              </button>
+
+              {/* Progress Pills */}
+              <div className="flex items-center gap-2 mb-6 z-10">
+                {playersState.map((_, pIdx) => (
+                  <div
+                    key={pIdx}
+                    className={`h-2.5 rounded-full transition-all duration-500 ${
+                      pIdx === introducingPlayerIndex
+                        ? 'w-10 bg-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.8)]'
+                        : pIdx < introducingPlayerIndex
+                        ? 'w-4 bg-emerald-400'
+                        : 'w-4 bg-white/20'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <motion.div
+                initial={{ y: -30, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="px-6 py-2 bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black text-sm md:text-base rounded-full uppercase tracking-widest shadow-xl mb-8 flex items-center gap-2 border-2 border-white/50 z-10"
+              >
+                <Sparkles className="w-5 h-5 text-slate-950 fill-current animate-spin-slow" />
+                <span>Challenger Spotlight #{playerNum} of {totalPlayers}</span>
+              </motion.div>
+
+              {/* Spotlight Player Card */}
+              <motion.div
+                initial={{ scale: 0.6, rotateY: 90, opacity: 0 }}
+                animate={{ scale: 1, rotateY: 0, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 120, damping: 16, delay: 0.2 }}
+                className="relative bg-slate-900/85 backdrop-blur-2xl p-8 md:p-12 rounded-[3.5rem] border-4 border-amber-400/60 shadow-[0_30px_90px_rgba(245,158,11,0.4)] flex flex-col items-center max-w-xl w-full z-10 overflow-hidden"
+              >
+                {/* Background Halo Glow */}
+                <div className="absolute -top-12 inset-x-0 h-28 bg-amber-400/25 blur-3xl rounded-full pointer-events-none" />
+
+                <div className="relative mb-6">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 18, ease: "linear" }}
+                    className="absolute -inset-4 rounded-full bg-gradient-to-tr from-amber-400 via-orange-500 to-yellow-300 opacity-80 blur-md pointer-events-none"
+                  />
+                  <div className="w-36 h-36 md:w-48 md:h-48 rounded-full overflow-hidden border-4 border-white shadow-2xl relative z-10 bg-slate-800">
+                    {player.photo ? (
+                      <img src={player.photo} alt={player.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-600 flex items-center justify-center font-black text-6xl text-white">
+                        {player.name ? player.name.charAt(0).toUpperCase() : 'P'}
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute -bottom-2 -right-2 bg-amber-400 text-slate-950 p-2.5 rounded-full shadow-lg z-20 border-2 border-white">
+                    <Crown className="w-6 h-6 fill-current" />
+                  </div>
+                </div>
+
+                <h3 className="text-4xl md:text-6xl font-black text-white drop-shadow-lg mb-2">
+                  {player.name || `Player ${playerNum}`}
+                </h3>
+
+                {player.topic && (
+                  <div className="mt-2 px-5 py-1.5 bg-indigo-500/30 border border-indigo-400/40 rounded-full text-indigo-200 font-bold text-lg md:text-xl flex items-center gap-2">
+                    <span>Specialty:</span>
+                    <span className="text-white font-extrabold">{player.topic}</span>
+                  </div>
+                )}
+
+                {player.details && (
+                  <p className="mt-4 text-base md:text-xl text-amber-100/90 italic text-center max-w-md leading-snug">
+                    "{player.details}"
+                  </p>
+                )}
+              </motion.div>
+
+              {/* Action Button */}
+              <motion.button
+                initial={{ y: 30, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.4, type: "spring" }}
+                onClick={() => {
+                  audioSynth.playSwoosh();
+                  window.speechSynthesis.cancel();
+                  if (introducingPlayerIndex + 1 < playersState.length) {
+                    setIntroducingPlayerIndex(prev => prev + 1);
+                  } else {
+                    setStage('multiplayer-intro');
+                  }
+                }}
+                className="mt-8 md:mt-10 px-10 py-5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-2xl shadow-[0_10px_40px_rgba(251,191,36,0.5)] hover:scale-105 active:scale-95 transition-all flex items-center gap-3 border-2 border-white z-20 cursor-pointer"
+              >
+                <span>{introducingPlayerIndex + 1 < playersState.length ? 'Next Challenger' : 'Battle'}</span>
+                <Play className="w-7 h-7 fill-current" />
+              </motion.button>
+            </motion.div>
+          );
+        })()}
+
         {stage === 'multiplayer-intro' && (
           <motion.div
             key="multiplayer-intro"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.01 } }}
-            className="text-center p-8 max-w-7xl flex flex-col items-center justify-center h-full z-10 w-full mx-auto relative"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 0.5 }}
+            className="text-center p-6 md:p-12 max-w-7xl flex flex-col items-center justify-center h-full z-10 w-full mx-auto relative overflow-hidden"
           >
+            {/* Background Floating Battle Icons */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-              {[...Array(15)].map((_, i) => (
+              {[...Array(20)].map((_, i) => (
                 <motion.div
-                  key={`star-${i}`}
+                  key={`star-battle-${i}`}
                   initial={{ 
                     x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000), 
                     y: (typeof window !== 'undefined' ? window.innerHeight : 1000) + 100,
@@ -1584,66 +2058,123 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   }}
                   className="absolute text-4xl"
                 >
-                  {Math.random() > 0.5 ? '⭐' : '🎈'}
+                  {i % 2 === 0 ? '⚔️' : (i % 3 === 0 ? '⭐' : '🔥')}
                 </motion.div>
               ))}
             </div>
 
-            <h2 className="text-5xl md:text-7xl font-black mb-12 tracking-tight drop-shadow-2xl text-white z-10">
-              {quiz.mode === 'interactive' && isMultipleFiles
-                ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
-                : "The Challengers"}
-            </h2>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 w-full z-10">
-              {playersState.map((player, idx) => (
-                <React.Fragment key={player.id || idx}>
-                  {idx > 0 && (
-                    <motion.div
-                      initial={{ scale: 0, rotate: -180, opacity: 0 }}
-                      animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                      transition={{ delay: 0.6, type: "spring", stiffness: 100, damping: 10 }}
-                      className="text-6xl md:text-8xl font-black text-yellow-300 italic drop-shadow-[0_0_30px_rgba(253,224,71,0.8)]"
-                    >
-                      VS
-                    </motion.div>
-                  )}
-                  <motion.div
-                    initial={{ scale: 0, rotate: 720, y: 200, opacity: 0 }}
-                    animate={{ scale: 1, rotate: 0, y: 0, opacity: 1 }}
-                    transition={{ delay: 0.2 * idx, type: "spring", stiffness: 70, damping: 12 }}
-                    className="flex flex-col items-center bg-white/10 p-8 rounded-3xl backdrop-blur-md border border-white/20 shadow-2xl w-full max-w-sm relative"
-                  >
-                    {player.photo ? (
-                      <img src={player.photo} alt={player.name} className="w-32 h-32 md:w-48 md:h-48 object-cover rounded-full shadow-[0_0_40px_rgba(255,255,255,0.4)] border-4 border-white mb-6" />
-                    ) : (
-                      <div className="w-32 h-32 md:w-48 md:h-48 bg-indigo-500 rounded-full shadow-[0_0_40px_rgba(255,255,255,0.4)] border-4 border-white mb-6 flex items-center justify-center text-6xl font-black text-white">
-                        {player.name.charAt(0).toUpperCase()}
-                      </div>
+            {/* Battle Screen Header */}
+            <motion.div
+              initial={{ y: -60, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 120, damping: 15 }}
+              className="z-10 flex flex-col items-center mb-6 md:mb-8"
+            >
+              <div className="px-6 py-2 bg-gradient-to-r from-red-500 via-amber-500 to-orange-500 text-white font-black text-sm md:text-lg rounded-full uppercase tracking-widest shadow-2xl mb-3 border-2 border-white/40">
+                ⚔️ Ultimate Quiz Showdown ⚔️
+              </div>
+              <h2 className="text-4xl md:text-6xl lg:text-7xl font-black text-white drop-shadow-[0_10px_25px_rgba(0,0,0,0.8)] tracking-tight">
+                THE CHALLENGERS
+              </h2>
+            </motion.div>
+
+            {/* Player Cards Clash Layout */}
+            <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 w-full max-w-5xl z-10 my-4">
+              {playersState.map((player, idx) => {
+                const isFirst = idx === 0;
+                const initialX = isFirst ? -250 : 250;
+
+                return (
+                  <React.Fragment key={player.id || idx}>
+                    {idx > 0 && (
+                      <motion.div
+                        initial={{ scale: 0, rotate: -360, opacity: 0 }}
+                        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                        transition={{ delay: 0.4, type: "spring", stiffness: 200, damping: 12 }}
+                        className="relative z-20 my-2 md:my-0"
+                      >
+                        <div className="w-20 h-20 md:w-28 md:h-28 rounded-full bg-gradient-to-br from-amber-400 via-red-500 to-orange-600 border-4 border-white shadow-[0_0_50px_rgba(245,158,11,0.9)] flex items-center justify-center text-3xl md:text-5xl font-black text-white italic tracking-wider animate-pulse">
+                          VS
+                        </div>
+                      </motion.div>
                     )}
-                    <h3 className="text-4xl md:text-5xl font-bold text-white drop-shadow-md mb-2">{player.name}</h3>
-                    {quiz.mode !== 'interactive' && player.topic && <p className="text-xl text-indigo-200 font-semibold mb-2">Topic: {player.topic}</p>}
-                    {player.details && <p className="text-lg text-white/80 italic text-center leading-tight">"{player.details}"</p>}
-                  </motion.div>
-                </React.Fragment>
-              ))}
+
+                    <motion.div
+                      initial={{ x: initialX, opacity: 0, scale: 0.8 }}
+                      animate={{ x: 0, opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.2 * idx + 0.2, type: "spring", stiffness: 100, damping: 14 }}
+                      className={`flex flex-col items-center p-8 md:p-10 rounded-[3rem] backdrop-blur-xl border-4 shadow-2xl w-full max-w-sm relative group overflow-hidden ${
+                        isFirst
+                          ? 'bg-gradient-to-b from-blue-900/85 to-indigo-950/95 border-cyan-400/60 shadow-[0_20px_60px_rgba(34,211,238,0.35)]'
+                          : 'bg-gradient-to-b from-rose-900/85 to-purple-950/95 border-rose-400/60 shadow-[0_20px_60px_rgba(244,63,94,0.35)]'
+                      }`}
+                    >
+                      {/* Corner Badge */}
+                      <div className={`absolute top-4 ${isFirst ? 'left-4' : 'right-4'} px-4 py-1 rounded-full text-xs md:text-sm font-black text-white uppercase tracking-wider ${isFirst ? 'bg-cyan-500' : 'bg-rose-500'}`}>
+                        Player {idx + 1}
+                      </div>
+
+                      {/* Photo / Avatar */}
+                      <div className="relative my-4">
+                        {player.photo ? (
+                          <img
+                            src={player.photo}
+                            alt={player.name}
+                            className="w-32 h-32 md:w-44 md:h-44 object-cover rounded-full shadow-[0_0_30px_rgba(255,255,255,0.4)] border-4 border-white"
+                          />
+                        ) : (
+                          <div className={`w-32 h-32 md:w-44 md:h-44 rounded-full shadow-[0_0_30px_rgba(255,255,255,0.4)] border-4 border-white flex items-center justify-center text-6xl font-black text-white ${isFirst ? 'bg-cyan-600' : 'bg-rose-600'}`}>
+                            {player.name ? player.name.charAt(0).toUpperCase() : 'P'}
+                          </div>
+                        )}
+                      </div>
+
+                      <h3 className="text-3xl md:text-5xl font-black text-white drop-shadow-md text-center mb-1">
+                        {player.name}
+                      </h3>
+
+                      {player.topic && (
+                        <p className="text-base md:text-lg text-amber-300 font-bold mt-1">
+                          Topic: {player.topic}
+                        </p>
+                      )}
+
+                      {player.details && (
+                        <p className="text-sm md:text-base text-white/80 italic text-center mt-2 leading-snug max-w-xs">
+                          "{player.details}"
+                        </p>
+                      )}
+                    </motion.div>
+                  </React.Fragment>
+                );
+              })}
             </div>
+
+            {/* Let the Battle Begin Button */}
             <motion.button
               initial={{ scale: 0, y: 50, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
-              transition={{ delay: 1.2, type: "spring", stiffness: 150, damping: 15 }}
+              transition={{ delay: 0.7, type: "spring", stiffness: 150, damping: 15 }}
               onClick={() => {
                 audioSynth.playSwoosh();
+                window.speechSynthesis.cancel();
                 if (quiz.rules) {
                   setStage('rules');
+                } else if (quiz.mode !== 'interactive' || quiz.type === 'rapid-fire' || quiz.type === 'combat-mode') {
+                  if (quiz.type === 'rapid-fire') {
+                    rapidFirePlayerIdxRef.current = null;
+                    setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
+                  }
+                  setStage('question');
                 } else if (categories.length > 1) {
                   setStage('category-selection');
                 } else {
                   setStage('question-selection');
                 }
               }}
-              className="mt-16 px-12 py-6 rounded-full bg-yellow-400 text-yellow-900 font-black text-3xl shadow-[0_0_50px_rgba(250,204,21,0.6)] hover:scale-105 transition-transform flex items-center gap-4 z-10"
+              className="mt-8 md:mt-12 px-10 py-5 md:px-14 md:py-6 rounded-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-amber-950 font-black text-2xl md:text-4xl shadow-[0_0_60px_rgba(250,204,21,0.8)] hover:scale-105 active:scale-95 transition-transform flex items-center gap-4 z-10 border-4 border-white cursor-pointer"
             >
-              <Play className="w-10 h-10 fill-current" />
+              <Play className="w-8 h-8 md:w-10 md:h-10 fill-current" />
               Let the Battle Begin!
             </motion.button>
           </motion.div>
@@ -1684,7 +2215,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               transition={{ delay: (quiz.rules?.split('\n').filter(r => r.trim()).length || 0) * 0.4 + 1.0, type: "spring", stiffness: 150 }}
               onClick={() => {
                 audioSynth.playSwoosh();
-                if (categories.length > 1) {
+                if (quiz.mode !== 'interactive' || quiz.type === 'rapid-fire' || quiz.type === 'combat-mode') {
+                  if (quiz.type === 'rapid-fire') {
+                    rapidFirePlayerIdxRef.current = null;
+                    setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
+                  }
+                  setStage('question');
+                } else if (categories.length > 1) {
                   setStage('category-selection');
                 } else {
                   setStage('question-selection');
@@ -2054,7 +2591,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               const maxBadges = Math.min(4, Math.max(1, Math.ceil(totalQ / 5)));
               const badgeInterval = Math.max(5, Math.ceil(totalQ / maxBadges));
               
-              const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
+              const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && quiz.type !== 'rapid-fire' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
               const numAnswered = isInteractiveGrid ? answeredQuestions.size : currentQuestionIndex;
               const earnedCount = Math.min(maxBadges, Math.floor(numAnswered / badgeInterval));
 
@@ -2192,7 +2729,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 {((question.imageUrl && !imageError) || uploadedImages[currentQuestionIndex] || (quiz.mode === 'interactive' && isImageQuestion)) && currentType !== 'find-in-map' && (
                   <div className={
                     isImageQuestion
-                      ? "w-full max-w-4xl h-[40vh] md:h-[500px] rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 mx-0 relative group"
+                      ? "w-full max-w-5xl h-[50vh] md:h-[600px] rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 mx-0 relative group flex-1"
                       : `shrink-0 rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 relative group ${currentType === '5-clues' || currentType === 'detective' || currentType === 'match-the-following' || currentType === 'word-search' ? 'w-40 h-40 md:w-48 md:h-48' : 'w-48 h-48 md:w-72 md:h-72'}`
                   }>
                     {uploadedImages[currentQuestionIndex] || (question.imageUrl && !imageError) ? (
@@ -2210,13 +2747,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                         <span className="text-sm font-semibold">No Image</span>
                       </div>
                     )}
-                    {quiz.mode === 'interactive' && (
-                      <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white cursor-pointer transition-opacity z-10">
-                        <Upload className="w-12 h-12 mb-2" />
-                        <span className="font-bold">Upload Image</span>
-                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                      </label>
-                    )}
+
                   </div>
                 )}
                 {(quiz.isOfflineMode || !isImageQuestion) && (
@@ -2295,6 +2826,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                             if (timerRef.current) clearInterval(timerRef.current);
                             setInteractiveOptionClicked(option);
                             if (isCorrect) {
+                              confetti({
+                                particleCount: 120,
+                                spread: 90,
+                                origin: { y: 0.6 },
+                                colors: ['#38bdf8', '#facc15', '#f43f5e', '#a855f7', '#34d399']
+                              });
                               setScore(s => {
                                 const inc = (getAwardPoints());
                                 const nextScore = s + inc;
@@ -2392,6 +2929,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                           if (timerRef.current) clearInterval(timerRef.current);
                           setInteractiveOptionClicked(sentence);
                           if (isFake) {
+                            confetti({
+                              particleCount: 120,
+                              spread: 90,
+                              origin: { y: 0.6 },
+                              colors: ['#38bdf8', '#facc15', '#f43f5e', '#a855f7', '#34d399']
+                            });
                             setScore(s => {
                               const inc = (getAwardPoints());
                               const nextScore = s + inc;
@@ -2672,6 +3215,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                             if (timerRef.current) clearInterval(timerRef.current);
                             setInteractiveOptionClicked(option);
                             if (isCorrect) {
+                              confetti({
+                                particleCount: 120,
+                                spread: 90,
+                                origin: { y: 0.6 },
+                                colors: ['#38bdf8', '#facc15', '#f43f5e', '#a855f7', '#34d399']
+                              });
                               setScore(s => s + (getAwardPoints()));
                               if (quiz.isMultiplayer || (quiz.players && quiz.players.length > 0)) {
                                 setPlayersState(prev => {
@@ -2788,113 +3337,254 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           </motion.div>
         )}
 
-        {stage === 'score' && quiz.mode === 'interactive' && (
+        {stage === 'score' && (
           <motion.div
             key="score"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-center p-12 max-w-7xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full"
+            className="text-center p-6 md:p-12 max-w-7xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full relative overflow-hidden"
           >
-            <div className="relative flex justify-center items-center mb-8">
-              <Trophy className="w-32 h-32 md:w-40 md:h-40 text-yellow-300 drop-shadow-[0_0_50px_rgba(250,204,21,0.8)]" />
-              <Star className="w-12 h-12 text-yellow-100 absolute -top-4 -right-8 animate-spin-slow" />
-              <Sparkles className="w-10 h-10 text-yellow-100 absolute top-4 -left-8 animate-ping" />
+            {/* Floating stars/sparkles background particles */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+              {[...Array(15)].map((_, i) => (
+                <motion.div
+                  key={`score-particle-${i}`}
+                  initial={{ 
+                    x: (i * 120) % 1200 - 600, 
+                    y: 800,
+                    opacity: 0.2 + (i % 5) * 0.15,
+                    scale: 0.6 + (i % 4) * 0.2
+                  }}
+                  animate={{ 
+                    y: -100, 
+                    rotate: 360 
+                  }}
+                  transition={{ 
+                    duration: 5 + (i % 5) * 2, 
+                    repeat: Infinity,
+                    delay: (i % 4) * 0.8
+                  }}
+                  className="absolute text-3xl"
+                  style={{ left: '50%' }}
+                >
+                  {i % 3 === 0 ? '🏆' : i % 2 === 0 ? '⭐' : '🎉'}
+                </motion.div>
+              ))}
             </div>
 
-            {quiz.isMultiplayer ? (
-              <div className="flex flex-col gap-6 w-full max-w-4xl">
-                <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-2xl mb-8">
-                  Final Scores!
-                </h1>
-                {[...playersState].sort((a, b) => a.score - b.score).map((player, idx) => (
-                  <motion.div 
-                    key={player.id}
-                    initial={{ x: -100, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: idx * 0.5, type: 'spring' }}
-                    className={`flex items-center justify-between p-6 rounded-3xl ${idx === (quiz.players?.length || 1) - 1 ? 'bg-yellow-400 text-yellow-900 shadow-[0_0_40px_rgba(250,204,21,0.6)] scale-105 border-4 border-white z-10' : 'bg-white/20 text-white backdrop-blur-sm border-2 border-white/30'}`}
-                  >
-                    <div className="flex items-center gap-6">
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl font-black ${idx === (quiz.players?.length || 1) - 1 ? 'bg-white text-yellow-500' : 'bg-white/30 text-white'}`}>
-                        {(quiz.players?.length || 1) - idx}
+            {/* Header Section */}
+            <div className="relative flex flex-col items-center justify-center mb-6 z-10">
+              <div className="relative mb-3 flex justify-center items-center">
+                <div className="absolute -inset-6 bg-amber-400/30 blur-2xl rounded-full animate-pulse" />
+                <Trophy className="w-28 h-28 md:w-36 md:h-36 text-yellow-300 drop-shadow-[0_0_50px_rgba(250,204,21,0.9)] relative z-10" />
+                <Star className="w-10 h-10 text-yellow-100 absolute -top-4 -right-8 animate-spin-slow z-10" />
+                <Sparkles className="w-8 h-8 text-yellow-100 absolute top-4 -left-8 animate-ping z-10" />
+              </div>
+
+              <div className="px-6 py-1.5 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 font-black text-sm md:text-base rounded-full uppercase tracking-widest shadow-xl border-2 border-white/60 mb-2">
+                🏆 FINAL SCOREBOARD 🏆
+              </div>
+
+              <h1 className="text-4xl md:text-6xl font-black text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)] tracking-tight">
+                {(quiz.isMultiplayer || (playersState && playersState.length > 1)) ? 'Final Leaderboard Standings!' : 'Quiz Completed!'}
+              </h1>
+            </div>
+
+            {/* Multiplayer / Players Leaderboard */}
+            {(quiz.isMultiplayer || (playersState && playersState.length > 1)) ? (
+              <div className="flex flex-col gap-4 w-full max-w-4xl z-10 my-2">
+                {[...playersState].sort((a, b) => b.score - a.score).map((player, idx) => {
+                  const isWinner = idx === 0;
+                  return (
+                    <motion.div 
+                      key={player.id || idx}
+                      initial={{ x: -100, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      transition={{ delay: idx * 0.15, type: 'spring', stiffness: 120 }}
+                      className={`flex items-center justify-between p-5 md:p-6 rounded-3xl backdrop-blur-xl border-4 transition-all ${
+                        isWinner 
+                          ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 shadow-[0_0_50px_rgba(250,204,21,0.8)] scale-105 border-white z-20' 
+                          : idx === 1
+                          ? 'bg-slate-800/90 text-white border-slate-300/60 shadow-xl'
+                          : idx === 2
+                          ? 'bg-amber-950/80 text-amber-100 border-amber-600/50 shadow-xl'
+                          : 'bg-slate-900/80 text-white border-white/20 shadow-lg'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4 md:gap-6">
+                        <div className={`w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center text-xl md:text-3xl font-black shadow-inner border-2 ${
+                          isWinner ? 'bg-slate-950 text-amber-400 border-white' : 'bg-white/20 text-white border-white/40'
+                        }`}>
+                          {idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                        </div>
+
+                        <div className="relative">
+                          {player.photo ? (
+                            <img src={player.photo} alt={player.name} className="w-14 h-14 md:w-18 md:h-18 rounded-full border-2 border-white object-cover shadow-md" />
+                          ) : (
+                            <div className={`w-14 h-14 md:w-18 md:h-18 rounded-full border-2 border-white flex items-center justify-center text-2xl font-black ${isWinner ? 'bg-amber-600 text-white' : 'bg-indigo-600 text-white'}`}>
+                              {player.name ? player.name.charAt(0).toUpperCase() : 'P'}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="text-left">
+                          <h2 className="text-2xl md:text-4xl font-extrabold drop-shadow-sm">{player.name}</h2>
+                          {player.topic && (
+                            <p className={`text-xs md:text-sm font-bold ${isWinner ? 'text-slate-900' : 'text-amber-200'}`}>
+                              Specialty: {player.topic}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      {player.photo && <img src={player.photo} className="w-16 h-16 rounded-full border-2 border-white object-cover" />}
-                      <h2 className="text-3xl md:text-5xl font-bold">{player.name}</h2>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {idx === (quiz.players?.length || 1) - 1 && <span className="text-5xl">👑</span>}
-                      <span className="text-5xl md:text-6xl font-black">{player.score}</span>
-                    </div>
-                  </motion.div>
-                ))}
-                
-                <div className="mt-8 flex flex-wrap justify-center gap-4">
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: (quiz.players?.length || 1) * 0.5 + 1 }}
-                    onClick={() => setStage('badges')}
-                    className="px-8 py-4 bg-white text-indigo-600 rounded-full font-bold text-xl md:text-2xl shadow-xl hover:bg-indigo-50 transition-all"
-                  >
-                    See Badges
-                  </motion.button>
-                </div>
+
+                      <div className="flex items-center gap-3">
+                        {isWinner && <Crown className="w-8 h-8 md:w-10 md:h-10 text-slate-950 fill-current animate-bounce" />}
+                        <div className={`px-5 py-2 rounded-2xl font-black text-3xl md:text-5xl shadow-md ${
+                          isWinner ? 'bg-slate-950 text-amber-300 border-2 border-white/50' : 'bg-white/15 text-white border border-white/30'
+                        }`}>
+                          {player.score || 0} <span className="text-sm md:text-xl font-bold opacity-80">pts</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             ) : (
-              <>
-                <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-2xl">
-                  {quiz.teamName || 'Player 1'}
-                </h1>
-                <div className="flex items-center justify-center gap-8 mt-4">
-                  <motion.div
-                    animate={{ 
-                      scale: [1, 1.3, 1],
-                      rotate: [-15, 15, -15],
-                      x: [0, 20, 0]
-                    }}
-                    transition={{ repeat: Infinity, duration: 0.4, ease: "easeInOut" }}
-                    className="text-[6rem] md:text-[10rem] drop-shadow-xl origin-right"
-                  >
-                    👏
-                  </motion.div>
-                  <p className="text-[10rem] md:text-[16rem] font-bold text-cyan-100 drop-shadow-lg leading-none">
-                    {score} <span className="text-[5rem] md:text-[8rem] text-cyan-200">/ {quiz.questions.length}</span>
-                  </p>
-                  <motion.div
-                    animate={{ 
-                      scale: [1, 1.3, 1],
-                      rotate: [15, -15, 15],
-                      x: [0, -20, 0]
-                    }}
-                    transition={{ repeat: Infinity, duration: 0.4, ease: "easeInOut" }}
-                    className="text-[6rem] md:text-[10rem] drop-shadow-xl origin-left"
-                    style={{ transform: "scaleX(-1)" }}
-                  >
-                    👏
-                  </motion.div>
-                </div>
-
+              /* Single Player Score View */
+              <div className="flex flex-col items-center w-full max-w-3xl z-10 my-4">
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.8 }}
-                  className="mt-10 flex flex-wrap justify-center gap-4"
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 100 }}
+                  className="bg-slate-900/85 backdrop-blur-2xl p-8 md:p-12 rounded-[3.5rem] border-4 border-amber-400/60 shadow-[0_20px_70px_rgba(245,158,11,0.35)] w-full flex flex-col items-center relative overflow-hidden"
                 >
-                  <button
-                    onClick={() => setStage('badges')}
-                    className="px-8 py-4 bg-white text-indigo-600 rounded-full font-bold text-xl md:text-2xl shadow-xl hover:bg-indigo-50 transition-all"
-                  >
-                    See Badges
-                  </button>
+                  <h2 className="text-3xl md:text-5xl font-black text-white mb-2 drop-shadow-md">
+                    {quiz.teamName || 'Player 1'}
+                  </h2>
+
+                  {/* Score Display */}
+                  {quiz.mode === 'video' ? (
+                    <div className="flex flex-col items-center my-6">
+                      <div className="text-6xl md:text-8xl font-black text-amber-300 drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] leading-none my-4">
+                        Quiz Completed!
+                      </div>
+                      <span className="text-lg md:text-2xl font-bold text-cyan-200 mt-2 bg-white/10 px-6 py-1.5 rounded-full border border-white/20">
+                        {quiz.questions.length} Questions
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-6 md:gap-10 my-6">
+                      <motion.div
+                        animate={{ 
+                          scale: [1, 1.25, 1],
+                          rotate: [-15, 15, -15]
+                        }}
+                        transition={{ repeat: Infinity, duration: 0.6, ease: "easeInOut" }}
+                        className="text-5xl md:text-8xl drop-shadow-xl"
+                      >
+                        👏
+                      </motion.div>
+
+                      <div className="flex flex-col items-center">
+                        <span className="text-2xl md:text-3xl font-extrabold text-amber-300 uppercase tracking-wider mb-1">
+                          Total Score
+                        </span>
+                        <div className="text-7xl md:text-9xl font-black text-white drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] leading-none">
+                          {score}
+                        </div>
+                        <span className="text-lg md:text-2xl font-bold text-cyan-200 mt-2 bg-white/10 px-6 py-1.5 rounded-full border border-white/20">
+                          {quiz.questions.length} Questions Answered
+                        </span>
+                      </div>
+
+                      <motion.div
+                        animate={{ 
+                          scale: [1, 1.25, 1],
+                          rotate: [15, -15, 15]
+                        }}
+                        transition={{ repeat: Infinity, duration: 0.6, ease: "easeInOut" }}
+                        className="text-5xl md:text-8xl drop-shadow-xl"
+                        style={{ transform: "scaleX(-1)" }}
+                      >
+                        👏
+                      </motion.div>
+                    </div>
+                  )}
+
+                  {/* Quick Breakdown Cards */}
+                  <div className={`grid ${quiz.mode === 'video' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-3'} gap-4 w-full mt-4`}>
+                    <div className="bg-white/10 p-4 rounded-2xl border border-white/20 flex flex-col items-center">
+                      <span className="text-xs md:text-sm font-bold text-amber-200 uppercase">Questions</span>
+                      <span className="text-2xl md:text-4xl font-black text-white">{quiz.questions.length}</span>
+                    </div>
+                    {quiz.mode !== 'video' && (
+                      <div className="bg-white/10 p-4 rounded-2xl border border-white/20 flex flex-col items-center">
+                        <span className="text-xs md:text-sm font-bold text-emerald-300 uppercase">Total Score</span>
+                        <span className="text-2xl md:text-4xl font-black text-white">{score} pts</span>
+                      </div>
+                    )}
+                    <div className={`${quiz.mode === 'video' ? '' : 'col-span-2 md:col-span-1'} bg-white/10 p-4 rounded-2xl border border-white/20 flex flex-col items-center`}>
+                      <span className="text-xs md:text-sm font-bold text-cyan-300 uppercase">Performance</span>
+                      <span className="text-xl md:text-2xl font-black text-amber-300">
+                        {quiz.mode === 'video' ? '🌟 Awesome!' : (score > 0 ? '🌟 Great Job' : '💪 Good Effort')}
+                      </span>
+                    </div>
+                  </div>
                 </motion.div>
-              </>
+              </div>
             )}
+
+            {/* Action Buttons: Play Again, See Badges, Export */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="mt-6 md:mt-8 flex flex-wrap items-center justify-center gap-4 md:gap-6 z-20"
+            >
+              {/* PLAY AGAIN BUTTON */}
+              <button
+                onClick={onExit}
+                className="px-10 py-5 rounded-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 font-black text-2xl shadow-[0_10px_30px_rgba(251,191,36,0.6)] hover:scale-105 active:scale-95 transition-all flex items-center gap-3 border-2 border-white cursor-pointer"
+              >
+                <RotateCcw className="w-7 h-7 stroke-[2.5]" />
+                <span>Play Again</span>
+              </button>
+
+              {/* SEE BADGES / CELEBRATION BUTTON */}
+              <button
+                onClick={() => {
+                  audioSynth.playSwoosh();
+                  if (earnedBadges.length > 0) {
+                    setStage('badges');
+                  } else if (quiz.quotes && quiz.quotes.length > 0) {
+                    setStage('quote');
+                  } else {
+                    setStage('celebrate');
+                  }
+                }}
+                className="px-8 py-5 rounded-full bg-white/15 hover:bg-white/25 text-white font-bold text-xl backdrop-blur-md border-2 border-white/40 shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 cursor-pointer"
+              >
+                <Award className="w-6 h-6 text-yellow-300" />
+                <span>See Badges & Awards</span>
+              </button>
+
+              {/* EXPORT RESULTS BUTTON */}
+              <button
+                onClick={handleExportResults}
+                title="Export Results (JSON)"
+                aria-label="Export Results (JSON)"
+                className="p-5 bg-white/15 hover:bg-white/25 text-white rounded-full shadow-xl border-2 border-white/40 transition-all hover:scale-110 active:scale-95 flex items-center justify-center cursor-pointer"
+              >
+                <Download className="w-7 h-7 text-yellow-300 drop-shadow" />
+              </button>
+            </motion.div>
           </motion.div>
         )}
 
         
         {stage === 'video-badges' && (() => {
-          const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
+          const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && quiz.type !== 'rapid-fire' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
           const numAnswered = isInteractiveGrid 
             ? answeredQuestions.size 
             : currentQuestionIndex + 1;
@@ -3010,125 +3700,208 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         {stage === 'celebrate' && quiz.mode === 'interactive' && (
           <motion.div
             key="celebrate"
-            initial={{ scale: 0.5, opacity: 0 }}
+            initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.5, opacity: 0 }}
-            className="text-center p-6 md:p-12 max-w-7xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full relative overflow-hidden"
+            exit={{ scale: 1.1, opacity: 0 }}
+            className="text-center p-4 md:p-8 max-w-7xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full relative overflow-hidden"
           >
-            {playersState[celebratingIndex] && (
-              <>
-                <motion.div 
-                  initial={{ y: -50, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ type: 'spring', delay: 0.2 }}
-                  className="mb-8 z-20 flex flex-col items-center"
-                >
-                  {playersState[celebratingIndex].photo ? (
-                    <motion.img 
-                      src={playersState[celebratingIndex].photo} 
-                      alt={playersState[celebratingIndex].name}
-                      initial={{ scale: 0, rotate: -180 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: "spring", bounce: 0.5, duration: 1, delay: 0.5 }}
-                      className="w-48 h-48 md:w-64 md:h-64 rounded-full object-cover border-8 border-white shadow-[0_0_50px_rgba(255,255,255,0.8)] mb-8"
-                    />
-                  ) : (
-                    <motion.div
-                      initial={{ scale: 0, rotate: -180 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: "spring", bounce: 0.5, duration: 1, delay: 0.5 }}
-                      className="w-48 h-48 md:w-64 md:h-64 rounded-full bg-indigo-500 text-white flex items-center justify-center font-black text-7xl md:text-8xl border-8 border-white shadow-[0_0_50px_rgba(255,255,255,0.8)] mb-8"
+            {celebrationPlayers[celebratingIndex] && (() => {
+              const currentP = celebrationPlayers[celebratingIndex];
+              const N = celebrationPlayers.length;
+              const currentRank = N - celebratingIndex;
+              const frame = getCelebrationFrame(currentRank, N, currentP.name, currentP.score || 0);
+
+              return (
+                <>
+                  {/* Top Score Order Progress Bar (Lowest to Highest) */}
+                  {N > 1 && (
+                    <motion.div 
+                      initial={{ y: -30, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      className="flex items-center justify-center gap-2 sm:gap-4 mb-4 z-30 w-full max-w-4xl px-2 flex-wrap"
                     >
-                      {playersState[celebratingIndex].name.charAt(0).toUpperCase()}
+                      <span className="text-xs uppercase tracking-widest font-black text-amber-300/90 mr-1 bg-black/40 px-3 py-1 rounded-full border border-amber-300/30">
+                        Celebration Order (Lowest ➔ Highest):
+                      </span>
+                      {celebrationPlayers.map((p, idx) => {
+                        const r = N - idx;
+                        const isCurrent = idx === celebratingIndex;
+                        return (
+                          <div
+                            key={p.id || idx}
+                            className={`px-3.5 py-1.5 rounded-2xl border flex items-center gap-2 text-xs md:text-sm font-black transition-all ${
+                              isCurrent 
+                                ? 'bg-amber-400 text-slate-950 border-white shadow-[0_0_30px_rgba(250,204,21,0.9)] scale-110 z-10 ring-2 ring-amber-300' 
+                                : idx < celebratingIndex
+                                ? 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40 opacity-70'
+                                : 'bg-black/50 text-white/70 border-white/20'
+                            }`}
+                          >
+                            <span>{r === 1 ? '👑 1st' : r === 2 ? '🥈 2nd' : r === 3 ? '🥉 3rd' : `${r}th`}</span>
+                            <span className="truncate max-w-[100px]">{p.name}</span>
+                            <span className="bg-white/20 px-2 py-0.5 rounded-lg text-[11px] font-extrabold">{p.score || 0} pts</span>
+                          </div>
+                        );
+                      })}
                     </motion.div>
                   )}
-                  <h2 className="text-5xl md:text-7xl font-black text-white mb-4 uppercase tracking-widest drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]">
-                    Congratulations!
-                  </h2>
-                  <h3 className="text-4xl md:text-6xl font-bold text-yellow-300 drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
-                    {playersState[celebratingIndex].name}
-                  </h3>
-                  <p className="text-2xl font-bold mt-4 bg-black/30 px-6 py-2 rounded-full inline-block border border-white/20 shadow-lg text-white">
-                    Score: {playersState[celebratingIndex].score}
-                  </p>
-                </motion.div>
 
-                {/* Animated Prizes Section */}
-                <div className="flex flex-wrap justify-center gap-8 md:gap-16 items-center my-8 z-20">
-                  <motion.div
-                    animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.2, 1] }}
-                    transition={{ repeat: Infinity, duration: 2 }}
-                    className="flex flex-col items-center gap-4"
+                  {/* Main Celebrated Player Spotlight */}
+                  <motion.div 
+                    initial={{ y: -40, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ type: 'spring', delay: 0.1 }}
+                    className="mb-6 z-20 flex flex-col items-center relative"
                   >
-                    <div className="w-32 h-32 md:w-48 md:h-48 bg-gradient-to-tr from-yellow-400 to-amber-600 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(251,191,36,0.6)] border-4 border-white/50">
-                      <Trophy className="w-16 h-16 md:w-24 md:h-24 text-white drop-shadow-lg" />
+                    {/* Rank Badge Header Pill */}
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', bounce: 0.6, delay: 0.2 }}
+                      className={`px-8 py-2.5 rounded-full text-xl md:text-3xl font-black text-white bg-gradient-to-r ${frame.badgeBg} shadow-[0_10px_30px_rgba(0,0,0,0.5)] border-2 border-white/80 uppercase tracking-wider mb-6 flex items-center gap-3`}
+                    >
+                      <Sparkles className="w-6 h-6 animate-spin-slow text-yellow-200" />
+                      <span>{frame.rankTitle}</span>
+                      <Sparkles className="w-6 h-6 animate-spin-slow text-yellow-200" />
+                    </motion.div>
+
+                    {/* Avatar with Crown/Rank Overlay */}
+                    <div className="relative mb-6">
+                      {/* Spinning Radial Light Rays in Background */}
+                      <div className="absolute -inset-8 bg-gradient-to-r from-amber-400/20 via-yellow-300/30 to-amber-500/20 rounded-full blur-2xl animate-spin-slow pointer-events-none" />
+
+                      {currentP.photo ? (
+                        <motion.img 
+                          src={currentP.photo} 
+                          alt={currentP.name}
+                          initial={{ scale: 0, rotate: -180 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: "spring", bounce: 0.5, duration: 1, delay: 0.3 }}
+                          className={`w-44 h-44 md:w-56 md:h-56 rounded-full object-cover border-8 border-white shadow-[0_0_60px_rgba(255,255,255,0.9)] relative z-10`}
+                        />
+                      ) : (
+                        <motion.div
+                          initial={{ scale: 0, rotate: -180 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: "spring", bounce: 0.5, duration: 1, delay: 0.3 }}
+                          className={`w-44 h-44 md:w-56 md:h-56 rounded-full bg-gradient-to-tr ${frame.badgeBg} text-white flex items-center justify-center font-black text-6xl md:text-8xl border-8 border-white shadow-[0_0_60px_rgba(255,255,255,0.9)] relative z-10`}
+                        >
+                          {currentP.name.charAt(0).toUpperCase()}
+                        </motion.div>
+                      )}
+
+                      {/* Floating Crown / Medal Icon on Top Right of Avatar */}
+                      <motion.div
+                        animate={{ y: [0, -8, 0], rotate: [-5, 5, -5] }}
+                        transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+                        className="absolute -top-4 -right-4 text-5xl md:text-6xl drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)] z-20"
+                      >
+                        {frame.crownIcon}
+                      </motion.div>
                     </div>
-                    <span className="text-xl md:text-2xl font-black text-white uppercase tracking-wider bg-black/40 px-6 py-2 rounded-full border border-white/20 shadow-lg">Champion Cup</span>
+
+                    <h2 className="text-4xl md:text-6xl font-black text-white mb-2 tracking-wide drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
+                      {currentP.name}
+                    </h2>
+                    
+                    <motion.div 
+                      animate={{ scale: [1, 1.04, 1] }}
+                      transition={{ repeat: Infinity, duration: 1.8 }}
+                      className="text-2xl md:text-3xl font-black bg-black/50 text-amber-300 px-8 py-2 rounded-full border-2 border-amber-300/40 shadow-2xl flex items-center gap-3 mt-1"
+                    >
+                      <Star className="w-6 h-6 text-yellow-300 fill-yellow-300 animate-pulse" />
+                      <span>Score: {currentP.score || 0} Points</span>
+                      <Star className="w-6 h-6 text-yellow-300 fill-yellow-300 animate-pulse" />
+                    </motion.div>
                   </motion.div>
 
-                  <motion.div
-                    animate={{ y: [0, -20, 0], scale: [1, 1.1, 1] }}
-                    transition={{ repeat: Infinity, duration: 2.5, delay: 0.5 }}
-                    className="flex flex-col items-center gap-4"
-                  >
-                    <div className="w-32 h-32 md:w-48 md:h-48 bg-gradient-to-tr from-emerald-400 to-teal-600 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(52,211,153,0.6)] border-4 border-white/50">
-                      <Award className="w-16 h-16 md:w-24 md:h-24 text-white drop-shadow-lg" />
-                    </div>
-                    <span className="text-xl md:text-2xl font-black text-white uppercase tracking-wider bg-black/40 px-6 py-2 rounded-full border border-white/20 shadow-lg">Master Medal</span>
-                  </motion.div>
+                  {/* Position-Specific Animated Prizes & Awards Section */}
+                  <div className="flex flex-wrap justify-center gap-6 md:gap-12 items-center my-4 z-20">
+                    {frame.awards.map((award, aIdx) => {
+                      const IconComp = award.icon;
+                      return (
+                        <motion.div
+                          key={aIdx}
+                          initial={{ scale: 0, y: 30 }}
+                          animate={{ scale: 1, y: 0 }}
+                          transition={{ type: 'spring', delay: 0.4 + aIdx * 0.15 }}
+                          whileHover={{ scale: 1.08 }}
+                          className="flex flex-col items-center gap-3 group"
+                        >
+                          <motion.div
+                            animate={
+                              aIdx === 0 
+                                ? { rotate: [0, 8, -8, 0], scale: [1, 1.15, 1] }
+                                : aIdx === 1
+                                ? { y: [0, -15, 0], scale: [1, 1.1, 1] }
+                                : { rotate: [0, -12, 12, 0], scale: [1, 1.12, 1] }
+                            }
+                            transition={{ repeat: Infinity, duration: 2.2 + aIdx * 0.4, delay: aIdx * 0.3 }}
+                            className={`w-28 h-28 md:w-36 md:h-36 bg-gradient-to-tr ${award.bg} rounded-3xl flex items-center justify-center shadow-[0_15px_35px_rgba(0,0,0,0.4)] border-4 border-white/60 relative overflow-hidden`}
+                          >
+                            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <IconComp className="w-14 h-14 md:w-20 md:h-20 text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.4)]" />
+                          </motion.div>
+                          <span className="text-base md:text-xl font-black text-white uppercase tracking-wider bg-black/60 px-5 py-1.5 rounded-full border border-white/30 shadow-lg">
+                            {award.title}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
 
-                  <motion.div
-                    animate={{ rotate: [0, -15, 15, 0], scale: [1, 1.15, 1] }}
-                    transition={{ repeat: Infinity, duration: 2.2, delay: 1 }}
-                    className="flex flex-col items-center gap-4"
-                  >
-                    <div className="w-32 h-32 md:w-48 md:h-48 bg-gradient-to-tr from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(192,38,211,0.6)] border-4 border-white/50">
-                      <Gift className="w-16 h-16 md:w-24 md:h-24 text-white drop-shadow-lg" />
-                    </div>
-                    <span className="text-xl md:text-2xl font-black text-white uppercase tracking-wider bg-black/40 px-6 py-2 rounded-full border border-white/20 shadow-lg">Mystery Box</span>
-                  </motion.div>
-                </div>
+                  {/* Next / Complete Celebration Control */}
+                  <div className="mt-4 z-30 flex flex-col items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const nextIdx = celebratingIndex + 1;
+                        if (nextIdx >= celebrationPlayers.length) {
+                          setStage('outro');
+                        } else {
+                          setCelebratingIndex(nextIdx);
+                        }
+                      }}
+                      className="px-10 py-4 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-slate-950 hover:from-amber-300 hover:to-yellow-300 rounded-full font-black text-xl shadow-[0_10px_30px_rgba(245,158,11,0.6)] hover:scale-105 active:scale-95 transition-all flex items-center gap-3 border-2 border-white cursor-pointer"
+                    >
+                      <span>
+                        {celebratingIndex < celebrationPlayers.length - 1
+                          ? `Next: ${N - (celebratingIndex + 1) === 1 ? '👑 1st Place Champion' : N - (celebratingIndex + 1) === 2 ? '🥈 2nd Place' : '🥉 3rd Place'}`
+                          : 'Finish Celebration ➔ Outro'}
+                      </span>
+                      <Play className="w-5 h-5 fill-current" />
+                    </button>
+                    <span className="text-xs text-white/70 font-semibold bg-black/30 px-3 py-1 rounded-full">
+                      Player {celebratingIndex + 1} of {N} • Extended Celebration for Video Display
+                    </span>
+                  </div>
 
-                <button
-                  onClick={() => {
-                    const nextIdx = celebratingIndex + 1;
-                    if (nextIdx >= playersState.length) {
-                      setStage('outro');
-                    } else {
-                      setCelebratingIndex(nextIdx);
-                    }
-                  }}
-                  className="mt-6 z-30 px-8 py-3 bg-white text-indigo-700 hover:bg-indigo-50 rounded-full font-bold text-lg shadow-xl transition-all"
-                >
-                  {celebratingIndex < playersState.length - 1 ? 'Next Player' : 'Finish Celebration'}
-                </button>
-
-                {/* Confetti & Sparkles */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
-                   {Array.from({ length: 30 }).map((_, i) => (
-                     <motion.div
-                       key={`confetti-${celebratingIndex}-${i}`}
-                       initial={{ y: -100, x: (Math.random() - 0.5) * 1500, opacity: 0, rotate: 0 }}
-                       animate={{ 
-                         y: 1000, 
-                         x: (Math.random() - 0.5) * 1500,
-                         opacity: [0, 1, 1, 0],
-                         rotate: 360
-                       }}
-                       transition={{ 
-                         duration: 3 + Math.random() * 4, 
-                         repeat: Infinity,
-                         delay: Math.random() * 2 
-                       }}
-                       className="absolute top-0 text-yellow-300"
-                       style={{ left: '50%' }}
-                     >
-                       <Star className={`w-8 h-8 md:w-12 md:h-12 ${i % 2 === 0 ? 'fill-yellow-300 text-yellow-300' : 'fill-pink-400 text-pink-400'}`} />
-                     </motion.div>
-                   ))}
-                </div>
-              </>
-            )}
+                  {/* Confetti & Floating Star Particles */}
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
+                    {Array.from({ length: 35 }).map((_, i) => (
+                      <motion.div
+                        key={`confetti-${celebratingIndex}-${i}`}
+                        initial={{ y: -100, x: (Math.random() - 0.5) * 1600, opacity: 0, rotate: 0 }}
+                        animate={{ 
+                          y: 1100, 
+                          x: (Math.random() - 0.5) * 1600,
+                          opacity: [0, 1, 1, 0],
+                          rotate: 360
+                        }}
+                        transition={{ 
+                          duration: 3.5 + Math.random() * 4.5, 
+                          repeat: Infinity,
+                          delay: Math.random() * 2.5 
+                        }}
+                        className="absolute top-0 text-yellow-300"
+                        style={{ left: '50%' }}
+                      >
+                        <Star className={`w-8 h-8 md:w-12 md:h-12 ${i % 3 === 0 ? 'fill-yellow-300 text-yellow-300' : i % 3 === 1 ? 'fill-amber-400 text-amber-400' : 'fill-pink-400 text-pink-400'}`} />
+                      </motion.div>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
           </motion.div>
         )}
 

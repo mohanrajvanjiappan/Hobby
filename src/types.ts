@@ -48,6 +48,7 @@ export interface QuizQuestion {
   wordsToFind?: string[];
   wordLocations?: WordSearchLocation[];
   correctAnswer: string;
+  playerIndex?: number;
   answer?: string;
   word?: string;
   correct_answer?: string;
@@ -94,12 +95,13 @@ export interface Quiz {
   isMultipleFilesLoaded?: boolean;
   players?: PlayerDetails[];
   title: string;
+  timeLimit?: number;
 
   theme?: QuizTheme;
   questions: QuizQuestion[];
   quotes?: Quote[];
   topic: string;
-  type?: 'multiple-choice' | '5-clues' | 'detective' | 'find-in-map' | 'jumbled-letters' | 'match-the-following' | 'combat-mode' | 'word-search' | 'mega-quiz' | 'identify-image' | 'text-presentation';
+  type?: 'multiple-choice' | '5-clues' | 'detective' | 'find-in-map' | 'jumbled-letters' | 'match-the-following' | 'combat-mode' | 'word-search' | 'mega-quiz' | 'identify-image' | 'text-presentation' | 'rapid-fire';
 }
 
 export type ScreenType = 'setup' | 'presentation';

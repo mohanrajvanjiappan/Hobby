@@ -122,7 +122,7 @@ ${textContent}
 `;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -332,6 +332,8 @@ CRITICAL RULES FOR ACCURACY:
         requiredQuestionProps.push("wordsToFind");
       } else if (quizType === 'mega-quiz') {
         contents += ` This is a Mega Quiz. Generate a wide mix of questions from all possible categories (history, science, geography, pop culture, sports, arts, literature, movies, logic, etc). For each question, provide 4 options. Ensure the questions are diverse and fun.`;
+      } else if (quizType === 'rapid-fire') {
+        contents += ` This is a 'Rapid Fire' round. Provide short, snappy questions and 4 options each. The questions should be quick to read and answer.`;
       } else {
         contents += ` This is a multiple choice quiz. For each question, provide 4 options.`;
       }
@@ -341,7 +343,7 @@ CRITICAL RULES FOR ACCURACY:
       while (retries > 0) {
         try {
           response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash",
             contents,
             config: {
               responseMimeType: "application/json",
