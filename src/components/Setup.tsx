@@ -263,6 +263,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
       data.showBadges = showBadges;
       data.enableClapping = enableClapping;
       data.rules = rules || undefined;
+      data.type = quizType;
       
       if (quizType === 'identify-image' && identifyMode === 'custom') {
         data.questions = data.questions.map((q: any) => {
@@ -704,7 +705,9 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
 
       const questionsWithPlayerIdx = item.questions.map(q => ({
         ...q,
-        playerIndex: firstType === 'rapid-fire' ? playerIdxCounter : undefined
+        playerIndex: undefined,
+        category: firstType === 'rapid-fire' ? (item.title || `Set ${playerIdxCounter + 1}`) : q.category,
+        timeLimit: firstType === 'rapid-fire' ? ((item as any).timeLimit || q.timeLimit || 60) : q.timeLimit
       }));
       combinedQuestions.push(...questionsWithPlayerIdx);
       if (firstType === 'rapid-fire') {
@@ -1143,26 +1146,6 @@ return (
                   isMultiplayer: numPlayers > 1,
                   players: players.map((p, i) => ({ ...p, name: p.name || `Player ${i + 1}` }))
                 };
-                
-                if (finalQuiz.type === 'rapid-fire' && finalQuiz.isMultiplayer) {
-                  const uniquePlayerIndices = new Set(finalQuiz.questions.map((q: any) => q.playerIndex).filter((i: number | undefined) => i !== undefined));
-                  if (uniquePlayerIndices.size <= 1) {
-                    const totalQ = finalQuiz.questions.length;
-                    const numP = finalQuiz.players.length;
-                    const qPerPlayer = Math.floor(totalQ / numP);
-                    if (qPerPlayer > 0) {
-                      finalQuiz.questions = finalQuiz.questions.slice(0, qPerPlayer * numP).map((q: any, idx: number) => ({
-                        ...q,
-                        playerIndex: Math.floor(idx / qPerPlayer)
-                      }));
-                    } else {
-                      finalQuiz.questions = finalQuiz.questions.map((q: any, idx: number) => ({
-                        ...q,
-                        playerIndex: idx
-                      }));
-                    }
-                  }
-                }
                 
                 audioSynth.setVoicePreference('none');
                 onQuizGenerated(finalQuiz);

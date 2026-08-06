@@ -761,7 +761,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           audioSynth.playSwoosh();
           if (quiz.rules) {
             setStage('rules');
-          } else if (quiz.mode !== 'interactive' || quiz.type === 'rapid-fire' || quiz.type === 'combat-mode') {
+          } else if (quiz.mode !== 'interactive' || (quiz.type === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
             if (quiz.type === 'rapid-fire') {
               rapidFirePlayerIdxRef.current = null;
               setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
@@ -804,7 +804,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         const goToNext = () => {
           const t2 = setTimeout(() => {
             audioSynth.playSwoosh();
-            if (quiz.mode !== 'interactive' || quiz.type === 'rapid-fire' || quiz.type === 'combat-mode') {
+            if (quiz.mode !== 'interactive' || (quiz.type === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
               if (quiz.type === 'rapid-fire') {
                 rapidFirePlayerIdxRef.current = null;
                 setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
@@ -1170,7 +1170,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
           } else {
             numAnswered = currentQuestionIndex + 1;
-            willComplete = numAnswered >= quiz.questions.length;
+            willComplete = quiz.type === 'rapid-fire' ? false : (numAnswered >= quiz.questions.length);
             if (quiz.isMultiplayer && quiz.mode === 'interactive' && quiz.type !== 'rapid-fire') {
               setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
             }
@@ -1183,7 +1183,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             const maxBadges = Math.min(4, Math.max(1, Math.ceil(totalQ / 5)));
             const badgeInterval = Math.max(5, Math.ceil(totalQ / maxBadges));
 
-            if (quiz.showBadges !== false && numAnswered > 0 && numAnswered % badgeInterval === 0 && numAnswered < totalQ) {
+            if (quiz.showBadges !== false && quiz.type !== 'rapid-fire' && numAnswered > 0 && numAnswered % badgeInterval === 0 && numAnswered < totalQ) {
               setStage('video-badges');
             } else {
               if (isInteractiveGrid) {
@@ -1201,8 +1201,21 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 setCurrentQuestionIndex((prev) => prev + 1);
                 if (quiz.type === 'rapid-fire') {
                   const nextQ = quiz.questions[currentQuestionIndex + 1];
-                  if (nextQ && nextQ.playerIndex !== undefined) {
-                    setCurrentPlayerIndex(nextQ.playerIndex);
+                  if (!nextQ || nextQ.category !== selectedCategory) {
+                    setAnsweredQuestions(prevAns => {
+                       const next = new Set(prevAns);
+                       quiz.questions.forEach((q, i) => {
+                           if (q.category === selectedCategory) next.add(i);
+                       });
+                       return next;
+                    });
+                    if (quiz.isMultiplayer) {
+                       setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
+                       setStage('category-selection');
+                    } else {
+                       setStage(categories.length > 1 ? 'category-selection' : 'score');
+                    }
+                    return;
                   }
                 }
                 setStage('question');
@@ -1338,7 +1351,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
 
       audioSynth.speak(speechMsg, () => {
         setTimeout(() => {
-           if (quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1)) {
+           if (quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && quiz.type !== 'rapid-fire' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1)) {
              if (categories.length > 1) {
                const categoryQuestions = quiz.questions.map((q, i) => ({q, i})).filter(x => x.q.category === selectedCategory);
                if (categoryQuestions.length > 0 && categoryQuestions.every(x => answeredQuestions.has(x.i) || x.i === currentQuestionIndex)) {
@@ -1349,10 +1362,29 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
              } else {
                setStage('question-selection');
              }
-           } else {
-             setCurrentQuestionIndex((prev) => prev + 1);
-             setStage('question');
-           }
+              } else {
+                setCurrentQuestionIndex((prev) => prev + 1);
+                if (quiz.type === 'rapid-fire') {
+                  const nextQ = quiz.questions[currentQuestionIndex + 1];
+                  if (!nextQ || nextQ.category !== selectedCategory) {
+                    setAnsweredQuestions(prevAns => {
+                       const next = new Set(prevAns);
+                       quiz.questions.forEach((q, i) => {
+                           if (q.category === selectedCategory) next.add(i);
+                       });
+                       return next;
+                    });
+                    if (quiz.isMultiplayer) {
+                       setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
+                       setStage('category-selection');
+                    } else {
+                       setStage(categories.length > 1 ? 'category-selection' : 'score');
+                    }
+                    return;
+                  }
+                }
+                setStage('question');
+              }
         }, 3000);
       });
       return () => window.speechSynthesis.cancel();
@@ -1524,18 +1556,19 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   // Rapid Fire Global Timer
   useEffect(() => {
     if (quiz.type === 'rapid-fire' && stage === 'question') {
-      const currentPlayerIdx = quiz.questions[currentQuestionIndex]?.playerIndex || 0;
-      const isNewSet = rapidFirePlayerIdxRef.current !== currentPlayerIdx;
+      const currentCategory = quiz.questions[currentQuestionIndex]?.category || '';
+      const isNewSet = rapidFirePlayerIdxRef.current !== currentCategory;
 
       if (isNewSet) {
         if (rapidFireTimerRef.current) {
           clearInterval(rapidFireTimerRef.current);
           rapidFireTimerRef.current = null;
         }
-
-        // Only set timeLeft if it hasn't been set yet for this player
-        setTimeLeft(quiz.timeLimit || 60);
-        rapidFirePlayerIdxRef.current = currentPlayerIdx;
+        
+        // Use the question's timeLimit (populated from JSON) or fallback
+        const limit = quiz.questions[currentQuestionIndex]?.timeLimit || quiz.timeLimit || 60;
+        setTimeLeft(limit);
+        rapidFirePlayerIdxRef.current = currentCategory;
         
         const timerId = setInterval(() => {
           if (isPausedRef.current) return;
@@ -1546,17 +1579,24 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 rapidFireTimerRef.current = null;
               }
               
-              const nextPlayerIdx = currentPlayerIdx + 1;
-              const nextIdx = quiz.questions.findIndex(q => (q.playerIndex || 0) === nextPlayerIdx);
-              
               audioSynth.playWrong();
               
-              if (nextIdx !== -1) {
-                setCurrentQuestionIndex(nextIdx);
-                setCurrentPlayerIndex(nextPlayerIdx);
+              setAnsweredQuestions(prevAns => {
+                  const next = new Set(prevAns);
+                  quiz.questions.forEach((q, i) => {
+                      if (q.category === currentCategory) next.add(i);
+                  });
+                  return next;
+              });
+              
+              if (quiz.isMultiplayer) {
+                 setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
+                 setStage('category-selection');
               } else {
-                setStage('score');
+                 const cats = new Set(quiz.questions.map(q => q.category).filter(Boolean));
+                 setStage(cats.size > 1 ? 'category-selection' : 'score');
               }
+              
               return 0;
             }
             if (prev <= 6) audioSynth.playTick();
@@ -1873,7 +1913,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   transition={{ type: "spring", stiffness: 200, damping: 20 }}
                   onClick={() => {
                     audioSynth.playSwoosh();
-                    if (quiz.mode !== 'interactive' || quiz.type === 'rapid-fire' || quiz.type === 'combat-mode') {
+                    if (quiz.mode !== 'interactive' || (quiz.type === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
                       setCurrentQuestionIndex(0);
                       if (quiz.type === 'rapid-fire') {
                         rapidFirePlayerIdxRef.current = null;
@@ -2160,7 +2200,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 window.speechSynthesis.cancel();
                 if (quiz.rules) {
                   setStage('rules');
-                } else if (quiz.mode !== 'interactive' || quiz.type === 'rapid-fire' || quiz.type === 'combat-mode') {
+                } else if (quiz.mode !== 'interactive' || (quiz.type === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
                   if (quiz.type === 'rapid-fire') {
                     rapidFirePlayerIdxRef.current = null;
                     setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
@@ -2215,7 +2255,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               transition={{ delay: (quiz.rules?.split('\n').filter(r => r.trim()).length || 0) * 0.4 + 1.0, type: "spring", stiffness: 150 }}
               onClick={() => {
                 audioSynth.playSwoosh();
-                if (quiz.mode !== 'interactive' || quiz.type === 'rapid-fire' || quiz.type === 'combat-mode') {
+                if (quiz.mode !== 'interactive' || (quiz.type === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
                   if (quiz.type === 'rapid-fire') {
                     rapidFirePlayerIdxRef.current = null;
                     setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
@@ -2258,7 +2298,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                     onClick={() => {
                       audioSynth.playSwoosh();
                       setSelectedCategory(cat);
-                      setStage('question-selection');
+                      if (quiz.type === 'rapid-fire') {
+                        const firstCatQ = catQuestions[0].idx;
+                        setCurrentQuestionIndex(firstCatQ);
+                        setStage('question');
+                      } else {
+                        setStage('question-selection');
+                      }
                     }}
                     className={`px-8 py-6 rounded-3xl text-3xl font-black transition-all flex flex-col items-center gap-2 shadow-xl ${
                       allAnswered
