@@ -12,7 +12,7 @@ interface PresentationProps {
   onExit: () => void;
 }
 
-type Stage = 'intro' | 'player-intro' | 'multiplayer-intro' | 'rules' | 'warmup' | 'countdown' | 'category-selection' | 'question-selection' | 'question' | 'reveal' | 'quote' | 'score' | 'badges' | 'talk' | 'celebrate' | 'outro' | 'video-badges';
+type Stage = 'intro' | 'player-intro' | 'multiplayer-intro' | 'rules' | 'warmup' | 'countdown' | 'category-selection' | 'rapid-fire-set-selection' | 'question-selection' | 'question' | 'reveal' | 'quote' | 'score' | 'badges' | 'talk' | 'celebrate' | 'outro' | 'video-badges';
 
 const OUTRO_MESSAGES = [
   {
@@ -243,9 +243,7 @@ const ParticipantVideoFrames: React.FC<ParticipantVideoFramesProps> = ({
 };
 
 export default function Presentation({ quiz, onExit }: PresentationProps) {
-  console.log("QUIZ TYPE IS:", quiz.type, "AND STAGE IS:", stage);
   const [stage, setStage] = useState<Stage>('intro');
-  console.log("QUIZ TYPE IS:", quiz.type, "AND STAGE IS:", stage);
   const [introducingPlayerIndex, setIntroducingPlayerIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -265,6 +263,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   const [jumbledInput, setJumbledInput] = useState<string>("");
   const [uploadedImages, setUploadedImages] = useState<Record<number, string>>({});
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedRapidFireSet, setSelectedRapidFireSet] = useState<string | null>(null);
   const categories = useMemo(() => Array.from(new Set(quiz.questions.map(q => q.category).filter(Boolean))) as string[], [quiz.questions]);
   const isMultipleFiles = useMemo(() => Boolean(
     quiz.isMultipleFilesLoaded ||
@@ -763,17 +762,16 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           audioSynth.playSwoosh();
           if (quiz.rules) {
             setStage('rules');
-          } else if (quiz.mode !== 'interactive' || (quiz.type === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
-            if (quiz.type === 'rapid-fire') {
+          } else if (quiz.mode !== 'interactive' || ((currentType as string) === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
+            if ((currentType as string) === 'rapid-fire') {
               rapidFirePlayerIdxRef.current = null;
               setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
             }
             setStage('question');
-          } else if (categories.length > 1 || quiz.type === 'rapid-fire') {
-            setStage('category-selection');
+          } else if (categories.length > 1 || (currentType as string) === 'rapid-fire') {
+            setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
           } else {
-            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
-            else setStage('question-selection');
+            setStage('question-selection');
           }
         }, 2000);
         timeouts.push(t2);
@@ -807,17 +805,16 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         const goToNext = () => {
           const t2 = setTimeout(() => {
             audioSynth.playSwoosh();
-            if (quiz.mode !== 'interactive' || (quiz.type === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
-              if (quiz.type === 'rapid-fire') {
+            if (quiz.mode !== 'interactive' || ((currentType as string) === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
+              if ((currentType as string) === 'rapid-fire') {
                 rapidFirePlayerIdxRef.current = null;
                 setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
               }
               setStage('question');
-            } else if (categories.length > 1 || quiz.type === 'rapid-fire') {
-              setStage('category-selection');
+            } else if (categories.length > 1 || (currentType as string) === 'rapid-fire') {
+              setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
             } else {
-            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
-            else setStage('question-selection');
+            setStage('question-selection');
           }
           }, 2000);
           timeouts.push(t2);
@@ -1035,7 +1032,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             return prev - 1;
           });
         }, 1000);
-      } else if (currentType === 'rapid-fire') {
+      } else if ((currentType as string) === 'rapid-fire') {
         audioSynth.speak(question.question);
       } else {
         let textToSpeak = question.question;
@@ -1105,37 +1102,35 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         audioSynth.speak(textToSpeak || 'Identify the image');
         if (quiz.type !== 'rapid-fire') {
           setTimeLeft(question.timeLimit);
-        }
         
-        
-        timerRef.current = setInterval(() => {
-          if (isPausedRef.current) return;
-          setTimeLeft((prev) => {
-            if (prev <= 1) {
-              if (timerRef.current) clearInterval(timerRef.current);
-              if (quiz.type === 'rapid-fire') {
-                setAnsweredQuestions(prevAns => {
-                   const next = new Set(prevAns);
-                   quiz.questions.forEach((q, i) => {
-                       if (q.category === selectedCategory) next.add(i);
-                   });
-                   return next;
-                });
-                if (quiz.isMultiplayer) {
-                   setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
-                   setStage('category-selection');
+          timerRef.current = setInterval(() => {
+            if (isPausedRef.current) return;
+            setTimeLeft((prev) => {
+              if (prev <= 1) {
+                if (timerRef.current) clearInterval(timerRef.current);
+                if ((currentType as string) === 'rapid-fire') {
+                  setAnsweredQuestions(prevAns => {
+                     const next = new Set(prevAns);
+                     quiz.questions.forEach((q, i) => {
+                         if (q.rapidFireSet ? q.rapidFireSet === selectedRapidFireSet : q.category === selectedCategory) next.add(i);
+                     });
+                     return next;
+                  });
+                  if (quiz.isMultiplayer) {
+                     setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
+                     setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
+                  } else {
+                     setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : (categories.length > 1 ? 'category-selection' : 'score'));
+                  }
                 } else {
-                   setStage(categories.length > 1 ? 'category-selection' : 'score');
+                  setStage('reveal');
                 }
-              } else {
-                setStage('reveal');
+                return 0;
               }
-              return 0;
-            }
-            if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
-            return prev - 1;
-          });
-        }, 1000);
+              if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
+              return prev - 1;
+            });
+          }, 1000);
         }
       }
       
@@ -1194,7 +1189,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
           } else {
             numAnswered = currentQuestionIndex + 1;
-            willComplete = quiz.type === 'rapid-fire' ? false : (numAnswered >= quiz.questions.length);
+            willComplete = (currentType as string) === 'rapid-fire' ? false : (numAnswered >= quiz.questions.length);
             if (quiz.isMultiplayer && quiz.mode === 'interactive' && quiz.type !== 'rapid-fire') {
               setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
             }
@@ -1214,32 +1209,30 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 if (categories.length > 1) {
                   const categoryQuestions = quiz.questions.map((q, i) => ({q, i})).filter(x => x.q.category === selectedCategory);
                   if (categoryQuestions.length > 0 && categoryQuestions.every(x => answeredQuestions.has(x.i) || x.i === currentQuestionIndex)) {
-                    setStage('category-selection');
+                    setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                   } else {
-            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
-            else setStage('question-selection');
+            setStage('question-selection');
           }
                 } else {
-            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
-            else setStage('question-selection');
+            setStage('question-selection');
           }
               } else {
                 setCurrentQuestionIndex((prev) => prev + 1);
-                if (quiz.type === 'rapid-fire') {
+                if ((currentType as string) === 'rapid-fire') {
                   const nextQ = quiz.questions[currentQuestionIndex + 1];
-                  if (!nextQ || nextQ.category !== selectedCategory) {
+                  if (!nextQ || (nextQ.rapidFireSet ? nextQ.rapidFireSet !== selectedRapidFireSet : nextQ.category !== selectedCategory)) {
                     setAnsweredQuestions(prevAns => {
                        const next = new Set(prevAns);
                        quiz.questions.forEach((q, i) => {
-                           if (q.category === selectedCategory) next.add(i);
+                           if (q.rapidFireSet ? q.rapidFireSet === selectedRapidFireSet : q.category === selectedCategory) next.add(i);
                        });
                        return next;
                     });
                     if (quiz.isMultiplayer) {
                        setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
-                       setStage('category-selection');
+                       setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                     } else {
-                       setStage(categories.length > 1 ? 'category-selection' : 'score');
+                       setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : (categories.length > 1 ? 'category-selection' : 'score'));
                     }
                     return;
                   }
@@ -1248,7 +1241,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               }
             }
           }
-        }, quiz.type === 'rapid-fire' ? 200 : 2000);
+        }, (currentType as string) === 'rapid-fire' ? 200 : 2000);
       };
 
       if (quiz.mode === 'interactive' && interactiveOptionClicked !== null) {
@@ -1381,32 +1374,30 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
              if (categories.length > 1) {
                const categoryQuestions = quiz.questions.map((q, i) => ({q, i})).filter(x => x.q.category === selectedCategory);
                if (categoryQuestions.length > 0 && categoryQuestions.every(x => answeredQuestions.has(x.i) || x.i === currentQuestionIndex)) {
-                 setStage('category-selection');
+                 setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                } else {
-            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
-            else setStage('question-selection');
+            setStage('question-selection');
           }
              } else {
-            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
-            else setStage('question-selection');
+            setStage('question-selection');
           }
               } else {
                 setCurrentQuestionIndex((prev) => prev + 1);
-                if (quiz.type === 'rapid-fire') {
+                if ((currentType as string) === 'rapid-fire') {
                   const nextQ = quiz.questions[currentQuestionIndex + 1];
-                  if (!nextQ || nextQ.category !== selectedCategory) {
+                  if (!nextQ || (nextQ.rapidFireSet ? nextQ.rapidFireSet !== selectedRapidFireSet : nextQ.category !== selectedCategory)) {
                     setAnsweredQuestions(prevAns => {
                        const next = new Set(prevAns);
                        quiz.questions.forEach((q, i) => {
-                           if (q.category === selectedCategory) next.add(i);
+                           if (q.rapidFireSet ? q.rapidFireSet === selectedRapidFireSet : q.category === selectedCategory) next.add(i);
                        });
                        return next;
                     });
                     if (quiz.isMultiplayer) {
                        setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
-                       setStage('category-selection');
+                       setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                     } else {
-                       setStage(categories.length > 1 ? 'category-selection' : 'score');
+                       setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : (categories.length > 1 ? 'category-selection' : 'score'));
                     }
                     return;
                   }
@@ -1583,8 +1574,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
 
   // Rapid Fire Global Timer
   useEffect(() => {
-    if (quiz.type === 'rapid-fire' && stage === 'question') {
-      const currentCategory = quiz.questions[currentQuestionIndex]?.category || '';
+    if ((currentType as string) === 'rapid-fire' && stage === 'question') {
+      const currentCategory = quiz.questions[currentQuestionIndex]?.rapidFireSet || quiz.questions[currentQuestionIndex]?.category || '';
       const isNewSet = rapidFirePlayerIdxRef.current !== currentCategory;
 
       if (isNewSet) {
@@ -1612,17 +1603,17 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               setAnsweredQuestions(prevAns => {
                   const next = new Set(prevAns);
                   quiz.questions.forEach((q, i) => {
-                      if (q.category === currentCategory) next.add(i);
+                      if (q.rapidFireSet ? q.rapidFireSet === currentCategory : q.category === currentCategory) next.add(i);
                   });
                   return next;
               });
               
               if (quiz.isMultiplayer) {
                  setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
-                 setStage('category-selection');
+                 setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
               } else {
                  const cats = new Set(quiz.questions.map(q => q.category).filter(Boolean));
-                 setStage(cats.size > 1 ? 'category-selection' : 'score');
+                 setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : (cats.size > 1 ? 'category-selection' : 'score'));
               }
               
               return 0;
@@ -1635,7 +1626,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         rapidFireTimerRef.current = timerId;
       }
     }
-    if (stage === 'score' || stage === 'celebrate') {
+    if (stage === 'score' || stage === 'celebrate' || stage === 'category-selection') {
       if (rapidFireTimerRef.current) {
         clearInterval(rapidFireTimerRef.current);
         rapidFireTimerRef.current = null;
@@ -1674,7 +1665,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   };
 
   const getAwardPoints = () => {
-    if (currentType === 'rapid-fire') return 1;
+    if ((currentType as string) === 'rapid-fire') return 1;
     let inc = (quiz.mode === 'interactive' && quiz.isMultiplayer ? 10 : 1);
     if (quiz.mode === 'interactive' && currentType === '5-clues') {
       inc = 10;
@@ -1727,22 +1718,22 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       audioSynth.playWrong();
     }
     window.speechSynthesis.cancel();
-                            if (quiz.type === 'rapid-fire') {
+                            if ((currentType as string) === 'rapid-fire') {
                               setCurrentQuestionIndex((prev) => prev + 1);
                               const nextQ = quiz.questions[currentQuestionIndex + 1];
-                              if (!nextQ || nextQ.category !== selectedCategory) {
+                              if (!nextQ || (nextQ.rapidFireSet ? nextQ.rapidFireSet !== selectedRapidFireSet : nextQ.category !== selectedCategory)) {
                                 setAnsweredQuestions(prevAns => {
                                   const next = new Set(prevAns);
                                   quiz.questions.forEach((q, i) => {
-                                      if (q.category === selectedCategory) next.add(i);
+                                      if (q.rapidFireSet ? q.rapidFireSet === selectedRapidFireSet : q.category === selectedCategory) next.add(i);
                                   });
                                   return next;
                                 });
                                 if (quiz.isMultiplayer) {
                                   setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
-                                  setStage('category-selection');
+                                  setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                                 } else {
-                                  setStage(categories.length > 1 ? 'category-selection' : 'score');
+                                  setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : (categories.length > 1 ? 'category-selection' : 'score'));
                                 }
                               } else {
                                 setStage('question');
@@ -1963,19 +1954,18 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   transition={{ type: "spring", stiffness: 200, damping: 20 }}
                   onClick={() => {
                     audioSynth.playSwoosh();
-                    if (quiz.mode !== 'interactive' || (quiz.type === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
+                    if (quiz.mode !== 'interactive' || ((currentType as string) === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
                       setCurrentQuestionIndex(0);
-                      if (quiz.type === 'rapid-fire') {
+                      if ((currentType as string) === 'rapid-fire') {
                         rapidFirePlayerIdxRef.current = null;
                         setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
                       }
                       setStage('question');
                     } else if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
-                      if (categories.length > 1 || quiz.type === 'rapid-fire') {
-                        setStage('category-selection');
+                      if (categories.length > 1 || (currentType as string) === 'rapid-fire') {
+                        setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                       } else {
-            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
-            else setStage('question-selection');
+            setStage('question-selection');
           }
                     } else {
                       setCurrentQuestionIndex(0);
@@ -2251,17 +2241,16 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 window.speechSynthesis.cancel();
                 if (quiz.rules) {
                   setStage('rules');
-                } else if (quiz.mode !== 'interactive' || (quiz.type === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
-                  if (quiz.type === 'rapid-fire') {
+                } else if (quiz.mode !== 'interactive' || ((currentType as string) === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
+                  if ((currentType as string) === 'rapid-fire') {
                     rapidFirePlayerIdxRef.current = null;
                     setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
                   }
                   setStage('question');
-                } else if (categories.length > 1 || quiz.type === 'rapid-fire') {
-                  setStage('category-selection');
+                } else if (categories.length > 1 || (currentType as string) === 'rapid-fire') {
+                  setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                 } else {
-            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
-            else setStage('question-selection');
+            setStage('question-selection');
           }
               }}
               className="mt-8 md:mt-12 px-10 py-5 md:px-14 md:py-6 rounded-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-amber-950 font-black text-2xl md:text-4xl shadow-[0_0_60px_rgba(250,204,21,0.8)] hover:scale-105 active:scale-95 transition-transform flex items-center gap-4 z-10 border-4 border-white cursor-pointer"
@@ -2307,17 +2296,16 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               transition={{ delay: (quiz.rules?.split('\n').filter(r => r.trim()).length || 0) * 0.4 + 1.0, type: "spring", stiffness: 150 }}
               onClick={() => {
                 audioSynth.playSwoosh();
-                if (quiz.mode !== 'interactive' || (quiz.type === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
-                  if (quiz.type === 'rapid-fire') {
+                if (quiz.mode !== 'interactive' || ((currentType as string) === 'rapid-fire' && (!quiz.isMultiplayer || quiz.mode !== 'interactive')) || quiz.type === 'combat-mode') {
+                  if ((currentType as string) === 'rapid-fire') {
                     rapidFirePlayerIdxRef.current = null;
                     setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
                   }
                   setStage('question');
-                } else if (categories.length > 1 || quiz.type === 'rapid-fire') {
-                  setStage('category-selection');
+                } else if (categories.length > 1 || (currentType as string) === 'rapid-fire') {
+                  setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                 } else {
-            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
-            else setStage('question-selection');
+            setStage('question-selection');
           }
               }}
               className="mt-12 px-12 py-6 rounded-full bg-yellow-400 text-yellow-900 font-black text-3xl shadow-[0_0_50px_rgba(250,204,21,0.6)] hover:scale-105 transition-transform flex items-center gap-4 z-10"
@@ -2337,7 +2325,9 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             className="flex flex-col items-center justify-center h-full p-8 z-10 w-full"
           >
             <h2 className="text-4xl md:text-6xl font-black mb-12 text-white drop-shadow-2xl">
-              {quiz.isMultiplayer ? `${playersState[currentPlayerIndex]?.name}, choose a category!` : 'Choose a Category!'}
+              {quiz.isMultiplayer 
+                ? `${playersState[currentPlayerIndex]?.name}, choose a ${((currentType as string) === 'rapid-fire' || quiz.type === 'rapid-fire') ? 'set' : 'category'}!` 
+                : `Choose a ${((currentType as string) === 'rapid-fire' || quiz.type === 'rapid-fire') ? 'Set' : 'Category'}!`}
             </h2>
             <div className="flex flex-wrap justify-center gap-6 max-w-6xl w-full mx-auto">
               {categories.map((cat, i) => {
@@ -2351,15 +2341,20 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                     onClick={() => {
                       audioSynth.playSwoosh();
                       setSelectedCategory(cat);
-                      if (quiz.type === 'rapid-fire') {
-                        const firstCatQ = catQuestions[0].idx;
-                        setCurrentQuestionIndex(firstCatQ);
-                        setTimeLeft(catQuestions[0].q.timeLimit);
-                        setStage('question');
+                      const isRapidFireCategory = catQuestions[0].q.type === 'rapid-fire';
+                      if (isRapidFireCategory) {
+                        const hasSets = catQuestions.some(q => q.q.rapidFireSet);
+                        if (hasSets) {
+                          setStage('rapid-fire-set-selection');
+                        } else {
+                          const firstCatQ = catQuestions[0].idx;
+                          setCurrentQuestionIndex(firstCatQ);
+                          setTimeLeft(catQuestions[0].q.timeLimit);
+                          setStage('question');
+                        }
                       } else {
-            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
-            else setStage('question-selection');
-          }
+                        setStage('question-selection');
+                      }
                     }}
                     className={`px-8 py-6 rounded-3xl text-3xl font-black transition-all flex flex-col items-center gap-2 shadow-xl ${
                       allAnswered
@@ -2388,6 +2383,65 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           </motion.div>
         )}
         
+        {stage === 'rapid-fire-set-selection' && (
+          <motion.div
+            key="rapid-fire-set-selection"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.1 }}
+            className="flex flex-col items-center justify-center h-full p-8 z-10 w-full"
+          >
+            <h2 className="text-4xl md:text-6xl font-black mb-12 text-white drop-shadow-2xl">
+              {quiz.isMultiplayer ? `${playersState[currentPlayerIndex]?.name}, choose a Set!` : 'Choose a Set!'}
+            </h2>
+            <div className="flex flex-wrap justify-center gap-6 max-w-6xl w-full mx-auto">
+              {Array.from(new Set(quiz.questions.filter(q => q.category === selectedCategory && q.rapidFireSet).map(q => q.rapidFireSet))).map((setKey, i) => {
+                const setQuestions = quiz.questions.map((q, idx) => ({ q, idx })).filter(x => x.q.category === selectedCategory && x.q.rapidFireSet === setKey);
+                const allAnswered = setQuestions.every(x => answeredQuestions.has(x.idx));
+                const answeredCount = setQuestions.filter(x => answeredQuestions.has(x.idx)).length;
+                return (
+                  <button
+                    key={setKey}
+                    disabled={allAnswered}
+                    onClick={() => {
+                      audioSynth.playSwoosh();
+                      setSelectedRapidFireSet(setKey as string);
+                      const firstCatQ = setQuestions[0].idx;
+                      setCurrentQuestionIndex(firstCatQ);
+                      setTimeLeft(setQuestions[0].q.timeLimit);
+                      setStage('question');
+                    }}
+                    className={`px-8 py-6 rounded-3xl text-3xl font-black transition-all flex flex-col items-center gap-2 shadow-xl ${
+                      allAnswered
+                        ? 'bg-slate-500/40 text-slate-300/40 cursor-not-allowed border-4 border-slate-400/30 shadow-inner'
+                        : 'bg-white text-indigo-700 hover:scale-105 active:translate-y-2'
+                    }`}
+                  >
+                    <span>{setKey as string}</span>
+                    <span className={`text-lg font-bold ${allAnswered ? 'text-slate-400/50' : 'text-indigo-400'}`}>
+                      {answeredCount} / {setQuestions.length} Answered
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            
+            <button
+              onClick={() => {
+                audioSynth.playSwoosh();
+                if (categories.length > 1) {
+                  setStage('category-selection');
+                } else {
+                  setStage('score');
+                }
+              }}
+              className="mt-16 px-8 py-4 bg-slate-500 text-white font-bold text-xl rounded-full shadow-lg hover:bg-slate-600 transition-colors"
+            >
+              Back
+            </button>
+          </motion.div>
+        )}
+
         {stage === 'question-selection' && (
           <motion.div
             key="question-selection"
@@ -2432,7 +2486,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   <button
                     onClick={() => {
                       audioSynth.playSwoosh();
-                      setStage('category-selection');
+                      setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                     }}
                     className="ml-2 px-4 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-base rounded-full shadow transition-all hover:scale-105 active:translate-y-0.5 border border-white/30"
                   >
@@ -2473,7 +2527,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 <button
                   onClick={() => {
                     audioSynth.playSwoosh();
-                    setStage('category-selection');
+                    setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                   }}
                   className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xl rounded-full shadow-lg transition-all hover:scale-105 active:translate-y-1 border border-white/20"
                 >
@@ -2966,22 +3020,22 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                               audioSynth.playWrong();
                             }
                             window.speechSynthesis.cancel();
-                            if (quiz.type === 'rapid-fire') {
+                            if ((currentType as string) === 'rapid-fire') {
                               setCurrentQuestionIndex((prev) => prev + 1);
                               const nextQ = quiz.questions[currentQuestionIndex + 1];
-                              if (!nextQ || nextQ.category !== selectedCategory) {
+                              if (!nextQ || (nextQ.rapidFireSet ? nextQ.rapidFireSet !== selectedRapidFireSet : nextQ.category !== selectedCategory)) {
                                 setAnsweredQuestions(prevAns => {
                                   const next = new Set(prevAns);
                                   quiz.questions.forEach((q, i) => {
-                                      if (q.category === selectedCategory) next.add(i);
+                                      if (q.rapidFireSet ? q.rapidFireSet === selectedRapidFireSet : q.category === selectedCategory) next.add(i);
                                   });
                                   return next;
                                 });
                                 if (quiz.isMultiplayer) {
                                   setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
-                                  setStage('category-selection');
+                                  setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                                 } else {
-                                  setStage(categories.length > 1 ? 'category-selection' : 'score');
+                                  setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : (categories.length > 1 ? 'category-selection' : 'score'));
                                 }
                               } else {
                                 setStage('question');
@@ -3091,22 +3145,22 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                             audioSynth.playWrong();
                           }
                           window.speechSynthesis.cancel();
-                            if (quiz.type === 'rapid-fire') {
+                            if ((currentType as string) === 'rapid-fire') {
                               setCurrentQuestionIndex((prev) => prev + 1);
                               const nextQ = quiz.questions[currentQuestionIndex + 1];
-                              if (!nextQ || nextQ.category !== selectedCategory) {
+                              if (!nextQ || (nextQ.rapidFireSet ? nextQ.rapidFireSet !== selectedRapidFireSet : nextQ.category !== selectedCategory)) {
                                 setAnsweredQuestions(prevAns => {
                                   const next = new Set(prevAns);
                                   quiz.questions.forEach((q, i) => {
-                                      if (q.category === selectedCategory) next.add(i);
+                                      if (q.rapidFireSet ? q.rapidFireSet === selectedRapidFireSet : q.category === selectedCategory) next.add(i);
                                   });
                                   return next;
                                 });
                                 if (quiz.isMultiplayer) {
                                   setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
-                                  setStage('category-selection');
+                                  setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                                 } else {
-                                  setStage(categories.length > 1 ? 'category-selection' : 'score');
+                                  setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : (categories.length > 1 ? 'category-selection' : 'score'));
                                 }
                               } else {
                                 setStage('question');
@@ -3391,22 +3445,22 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                               audioSynth.playWrong();
                             }
                             window.speechSynthesis.cancel();
-                            if (quiz.type === 'rapid-fire') {
+                            if ((currentType as string) === 'rapid-fire') {
                               setCurrentQuestionIndex((prev) => prev + 1);
                               const nextQ = quiz.questions[currentQuestionIndex + 1];
-                              if (!nextQ || nextQ.category !== selectedCategory) {
+                              if (!nextQ || (nextQ.rapidFireSet ? nextQ.rapidFireSet !== selectedRapidFireSet : nextQ.category !== selectedCategory)) {
                                 setAnsweredQuestions(prevAns => {
                                   const next = new Set(prevAns);
                                   quiz.questions.forEach((q, i) => {
-                                      if (q.category === selectedCategory) next.add(i);
+                                      if (q.rapidFireSet ? q.rapidFireSet === selectedRapidFireSet : q.category === selectedCategory) next.add(i);
                                   });
                                   return next;
                                 });
                                 if (quiz.isMultiplayer) {
                                   setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
-                                  setStage('category-selection');
+                                  setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
                                 } else {
-                                  setStage(categories.length > 1 ? 'category-selection' : 'score');
+                                  setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : (categories.length > 1 ? 'category-selection' : 'score'));
                                 }
                               } else {
                                 setStage('question');

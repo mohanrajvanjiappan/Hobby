@@ -49,6 +49,7 @@ export interface QuizQuestion {
   wordLocations?: WordSearchLocation[];
   correctAnswer: string;
   playerIndex?: number;
+  rapidFireSet?: string;
   answer?: string;
   word?: string;
   correct_answer?: string;
