@@ -243,7 +243,9 @@ const ParticipantVideoFrames: React.FC<ParticipantVideoFramesProps> = ({
 };
 
 export default function Presentation({ quiz, onExit }: PresentationProps) {
+  console.log("QUIZ TYPE IS:", quiz.type, "AND STAGE IS:", stage);
   const [stage, setStage] = useState<Stage>('intro');
+  console.log("QUIZ TYPE IS:", quiz.type, "AND STAGE IS:", stage);
   const [introducingPlayerIndex, setIntroducingPlayerIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -767,10 +769,11 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
             }
             setStage('question');
-          } else if (categories.length > 1) {
+          } else if (categories.length > 1 || quiz.type === 'rapid-fire') {
             setStage('category-selection');
           } else {
-            setStage('question-selection');
+            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
+            else setStage('question-selection');
           }
         }, 2000);
         timeouts.push(t2);
@@ -810,11 +813,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
               }
               setStage('question');
-            } else if (categories.length > 1) {
+            } else if (categories.length > 1 || quiz.type === 'rapid-fire') {
               setStage('category-selection');
             } else {
-              setStage('question-selection');
-            }
+            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
+            else setStage('question-selection');
+          }
           }, 2000);
           timeouts.push(t2);
         };
@@ -1099,20 +1103,40 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           textToSpeak = themedPrompts[currentQuestionIndex % themedPrompts.length];
         }
         audioSynth.speak(textToSpeak || 'Identify the image');
-        setTimeLeft(question.timeLimit);
+        if (quiz.type !== 'rapid-fire') {
+          setTimeLeft(question.timeLimit);
+        }
+        
         
         timerRef.current = setInterval(() => {
           if (isPausedRef.current) return;
           setTimeLeft((prev) => {
             if (prev <= 1) {
               if (timerRef.current) clearInterval(timerRef.current);
-              setStage('reveal');
+              if (quiz.type === 'rapid-fire') {
+                setAnsweredQuestions(prevAns => {
+                   const next = new Set(prevAns);
+                   quiz.questions.forEach((q, i) => {
+                       if (q.category === selectedCategory) next.add(i);
+                   });
+                   return next;
+                });
+                if (quiz.isMultiplayer) {
+                   setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
+                   setStage('category-selection');
+                } else {
+                   setStage(categories.length > 1 ? 'category-selection' : 'score');
+                }
+              } else {
+                setStage('reveal');
+              }
               return 0;
             }
             if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
             return prev - 1;
           });
         }, 1000);
+        }
       }
       
       return () => {
@@ -1192,11 +1216,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   if (categoryQuestions.length > 0 && categoryQuestions.every(x => answeredQuestions.has(x.i) || x.i === currentQuestionIndex)) {
                     setStage('category-selection');
                   } else {
-                    setStage('question-selection');
-                  }
+            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
+            else setStage('question-selection');
+          }
                 } else {
-                  setStage('question-selection');
-                }
+            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
+            else setStage('question-selection');
+          }
               } else {
                 setCurrentQuestionIndex((prev) => prev + 1);
                 if (quiz.type === 'rapid-fire') {
@@ -1357,11 +1383,13 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                if (categoryQuestions.length > 0 && categoryQuestions.every(x => answeredQuestions.has(x.i) || x.i === currentQuestionIndex)) {
                  setStage('category-selection');
                } else {
-                 setStage('question-selection');
-               }
+            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
+            else setStage('question-selection');
+          }
              } else {
-               setStage('question-selection');
-             }
+            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
+            else setStage('question-selection');
+          }
               } else {
                 setCurrentQuestionIndex((prev) => prev + 1);
                 if (quiz.type === 'rapid-fire') {
@@ -1699,7 +1727,29 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       audioSynth.playWrong();
     }
     window.speechSynthesis.cancel();
-    setStage('reveal');
+                            if (quiz.type === 'rapid-fire') {
+                              setCurrentQuestionIndex((prev) => prev + 1);
+                              const nextQ = quiz.questions[currentQuestionIndex + 1];
+                              if (!nextQ || nextQ.category !== selectedCategory) {
+                                setAnsweredQuestions(prevAns => {
+                                  const next = new Set(prevAns);
+                                  quiz.questions.forEach((q, i) => {
+                                      if (q.category === selectedCategory) next.add(i);
+                                  });
+                                  return next;
+                                });
+                                if (quiz.isMultiplayer) {
+                                  setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
+                                  setStage('category-selection');
+                                } else {
+                                  setStage(categories.length > 1 ? 'category-selection' : 'score');
+                                }
+                              } else {
+                                setStage('question');
+                              }
+                            } else {
+                              setStage('reveal');
+                            }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1921,11 +1971,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       }
                       setStage('question');
                     } else if (quiz.isMultiplayer && (quiz.players?.length || 1) > 1) {
-                      if (categories.length > 1) {
+                      if (categories.length > 1 || quiz.type === 'rapid-fire') {
                         setStage('category-selection');
                       } else {
-                        setStage('question-selection');
-                      }
+            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
+            else setStage('question-selection');
+          }
                     } else {
                       setCurrentQuestionIndex(0);
                       setStage('question');
@@ -2206,11 +2257,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                     setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
                   }
                   setStage('question');
-                } else if (categories.length > 1) {
+                } else if (categories.length > 1 || quiz.type === 'rapid-fire') {
                   setStage('category-selection');
                 } else {
-                  setStage('question-selection');
-                }
+            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
+            else setStage('question-selection');
+          }
               }}
               className="mt-8 md:mt-12 px-10 py-5 md:px-14 md:py-6 rounded-full bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-amber-950 font-black text-2xl md:text-4xl shadow-[0_0_60px_rgba(250,204,21,0.8)] hover:scale-105 active:scale-95 transition-transform flex items-center gap-4 z-10 border-4 border-white cursor-pointer"
             >
@@ -2261,11 +2313,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                     setCurrentPlayerIndex(quiz.questions[0]?.playerIndex || 0);
                   }
                   setStage('question');
-                } else if (categories.length > 1) {
+                } else if (categories.length > 1 || quiz.type === 'rapid-fire') {
                   setStage('category-selection');
                 } else {
-                  setStage('question-selection');
-                }
+            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
+            else setStage('question-selection');
+          }
               }}
               className="mt-12 px-12 py-6 rounded-full bg-yellow-400 text-yellow-900 font-black text-3xl shadow-[0_0_50px_rgba(250,204,21,0.6)] hover:scale-105 transition-transform flex items-center gap-4 z-10"
             >
@@ -2301,10 +2354,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       if (quiz.type === 'rapid-fire') {
                         const firstCatQ = catQuestions[0].idx;
                         setCurrentQuestionIndex(firstCatQ);
+                        setTimeLeft(catQuestions[0].q.timeLimit);
                         setStage('question');
                       } else {
-                        setStage('question-selection');
-                      }
+            if (quiz.type === 'rapid-fire' || (quiz.title && quiz.title.toLowerCase().includes('rapid'))) setStage('category-selection');
+            else setStage('question-selection');
+          }
                     }}
                     className={`px-8 py-6 rounded-3xl text-3xl font-black transition-all flex flex-col items-center gap-2 shadow-xl ${
                       allAnswered
@@ -2911,7 +2966,29 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                               audioSynth.playWrong();
                             }
                             window.speechSynthesis.cancel();
-                            setStage('reveal');
+                            if (quiz.type === 'rapid-fire') {
+                              setCurrentQuestionIndex((prev) => prev + 1);
+                              const nextQ = quiz.questions[currentQuestionIndex + 1];
+                              if (!nextQ || nextQ.category !== selectedCategory) {
+                                setAnsweredQuestions(prevAns => {
+                                  const next = new Set(prevAns);
+                                  quiz.questions.forEach((q, i) => {
+                                      if (q.category === selectedCategory) next.add(i);
+                                  });
+                                  return next;
+                                });
+                                if (quiz.isMultiplayer) {
+                                  setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
+                                  setStage('category-selection');
+                                } else {
+                                  setStage(categories.length > 1 ? 'category-selection' : 'score');
+                                }
+                              } else {
+                                setStage('question');
+                              }
+                            } else {
+                              setStage('reveal');
+                            }
                           }
                         }}
                         className={`px-6 py-5 rounded-2xl text-2xl md:text-3xl font-bold flex items-center gap-4 transition-all duration-500 ${optClass}`}>
@@ -3014,7 +3091,29 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                             audioSynth.playWrong();
                           }
                           window.speechSynthesis.cancel();
-                          setStage('reveal');
+                            if (quiz.type === 'rapid-fire') {
+                              setCurrentQuestionIndex((prev) => prev + 1);
+                              const nextQ = quiz.questions[currentQuestionIndex + 1];
+                              if (!nextQ || nextQ.category !== selectedCategory) {
+                                setAnsweredQuestions(prevAns => {
+                                  const next = new Set(prevAns);
+                                  quiz.questions.forEach((q, i) => {
+                                      if (q.category === selectedCategory) next.add(i);
+                                  });
+                                  return next;
+                                });
+                                if (quiz.isMultiplayer) {
+                                  setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
+                                  setStage('category-selection');
+                                } else {
+                                  setStage(categories.length > 1 ? 'category-selection' : 'score');
+                                }
+                              } else {
+                                setStage('question');
+                              }
+                            } else {
+                              setStage('reveal');
+                            }
                         }
                       }}
                       initial={{ opacity: 0, x: -20 }}
@@ -3292,7 +3391,29 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                               audioSynth.playWrong();
                             }
                             window.speechSynthesis.cancel();
-                            setStage('reveal');
+                            if (quiz.type === 'rapid-fire') {
+                              setCurrentQuestionIndex((prev) => prev + 1);
+                              const nextQ = quiz.questions[currentQuestionIndex + 1];
+                              if (!nextQ || nextQ.category !== selectedCategory) {
+                                setAnsweredQuestions(prevAns => {
+                                  const next = new Set(prevAns);
+                                  quiz.questions.forEach((q, i) => {
+                                      if (q.category === selectedCategory) next.add(i);
+                                  });
+                                  return next;
+                                });
+                                if (quiz.isMultiplayer) {
+                                  setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
+                                  setStage('category-selection');
+                                } else {
+                                  setStage(categories.length > 1 ? 'category-selection' : 'score');
+                                }
+                              } else {
+                                setStage('question');
+                              }
+                            } else {
+                              setStage('reveal');
+                            }
                           }
                         }}
                         animate={isReveal && isCorrect ? { scale: [1, 1.05, 1] } : {}}

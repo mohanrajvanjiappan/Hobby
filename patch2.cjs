@@ -1,46 +1,71 @@
 const fs = require('fs');
-let content = fs.readFileSync('src/components/Setup.tsx', 'utf8');
-content = content.replace(
-  /<button\s+type="submit"\s+disabled=\{loading \|\| !topic\.trim\(\) \|\| \(quizType === 'identify-image' && !cacheSuccess\)\}[\s\S]*?<\/button>/,
-  `
-          <div className="flex flex-col sm:flex-row gap-4 mt-4">
-            <button
-              type="button"
-              onClick={(e) => handleGenerate(e as any, 'video')}
-              disabled={loading || !topic.trim() || (quizType === 'identify-image' && !cacheSuccess)}
-              className="flex-1 py-4 rounded-xl bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Play className="w-6 h-6 fill-current" />
-                  Video Quiz
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={(e) => handleGenerate(e as any, 'interactive')}
-              disabled={loading || !topic.trim() || (quizType === 'identify-image' && !cacheSuccess)}
-              className="flex-1 py-4 rounded-xl bg-fuchsia-600 text-white font-bold text-lg hover:bg-fuchsia-700 focus:outline-none focus:ring-4 focus:ring-fuchsia-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-600/20"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-6 h-6 fill-current" />
-                  Interactive Mode
-                </>
-              )}
-            </button>
-          </div>
-  `
+let code = fs.readFileSync('src/components/Presentation.tsx', 'utf8');
+
+// Replace category selection click handler
+code = code.replace(
+  `                      if (quiz.type === 'rapid-fire') {
+                        const firstCatQ = catQuestions[0].idx;
+                        setCurrentQuestionIndex(firstCatQ);
+                        setStage('question');
+                      } else {`,
+  `                      if (quiz.type === 'rapid-fire') {
+                        const firstCatQ = catQuestions[0].idx;
+                        setCurrentQuestionIndex(firstCatQ);
+                        setTimeLeft(catQuestions[0].q.timeLimit);
+                        setStage('question');
+                      } else {`
 );
-fs.writeFileSync('src/components/Setup.tsx', content);
+
+// Replace timeLimit logic in question stage
+code = code.replace(
+  `        audioSynth.speak(textToSpeak || 'Identify the image');
+        setTimeLeft(question.timeLimit);
+        
+        timerRef.current = setInterval(() => {
+          if (isPausedRef.current) return;
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              if (timerRef.current) clearInterval(timerRef.current);
+              setStage('reveal');
+              return 0;
+            }
+            if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
+            return prev - 1;
+          });
+        }, 1000);`,
+  `        audioSynth.speak(textToSpeak || 'Identify the image');
+        if (quiz.type !== 'rapid-fire') {
+          setTimeLeft(question.timeLimit);
+        }
+        
+        timerRef.current = setInterval(() => {
+          if (isPausedRef.current) return;
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              if (timerRef.current) clearInterval(timerRef.current);
+              if (quiz.type === 'rapid-fire') {
+                setAnsweredQuestions(prevAns => {
+                   const next = new Set(prevAns);
+                   quiz.questions.forEach((q, i) => {
+                       if (q.category === selectedCategory) next.add(i);
+                   });
+                   return next;
+                });
+                if (quiz.isMultiplayer) {
+                   setCurrentPlayerIndex(p => (p + 1) % (quiz.players?.length || 1));
+                   setStage('category-selection');
+                } else {
+                   setStage(categories.length > 1 ? 'category-selection' : 'score');
+                }
+              } else {
+                setStage('reveal');
+              }
+              return 0;
+            }
+            if (quiz.mode !== 'interactive' || prev <= 6) audioSynth.playTick();
+            return prev - 1;
+          });
+        }, 1000);`
+);
+
+fs.writeFileSync('src/components/Presentation.tsx', code);

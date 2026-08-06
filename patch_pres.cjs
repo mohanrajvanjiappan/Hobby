@@ -1,16 +1,12 @@
 const fs = require('fs');
-let content = fs.readFileSync('src/components/Presentation.tsx', 'utf8');
-content = content.replace(
-  /const \[imageError, setImageError\] = useState\(false\);/,
-  `const [imageError, setImageError] = useState(false);
-  const [score, setScore] = useState(0);
-  const [interactiveOptionClicked, setInteractiveOptionClicked] = useState<string | null>(null);`
-);
-content = content.replace(
-  /useEffect\(\(\) => \{\n\s*setImageError\(false\);\n\s*\}, \[currentQuestionIndex\]\);/,
-  `useEffect(() => {
-    setImageError(false);
-    setInteractiveOptionClicked(null);
-  }, [currentQuestionIndex]);`
-);
-fs.writeFileSync('src/components/Presentation.tsx', content);
+let code = fs.readFileSync('src/components/Presentation.tsx', 'utf8');
+
+// Replace question-selection route with category-selection if rapid-fire
+code = code.replace(/} else \{\n\s*setStage\('question-selection'\);\n\s*\}/g, (match) => {
+  return `} else {
+            if (quiz.type === 'rapid-fire') setStage('category-selection');
+            else setStage('question-selection');
+          }`;
+});
+
+fs.writeFileSync('src/components/Presentation.tsx', code);
