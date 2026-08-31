@@ -79,14 +79,10 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
     } finally {
       setLoading(false);
       const finalQuiz = { ...quizToEnrich, mode, showBadges, enableMemoryBreak, themeMemoryBreak, memoryBreakImageCount, enableInsightImages, dynamicColors: enableDynamicColors, rules: rules || undefined };
-      if (enableInsightImages && finalQuiz.questions?.some(q => q.insightImageUrl)) {
-        setPreviewQuizData({ quiz: finalQuiz, mode });
+      if (mode === 'interactive') {
+        setPendingInteractiveQuiz(finalQuiz);
       } else {
-        if (mode === 'interactive') {
-          setPendingInteractiveQuiz(finalQuiz);
-        } else {
-          onQuizGenerated(finalQuiz);
-        }
+        onQuizGenerated(finalQuiz);
       }
     }
   };
@@ -386,14 +382,10 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
         });
       }
 
-      if (enableInsightImages && data.questions?.some((q: any) => q.insightImageUrl)) {
-        setPreviewQuizData({ quiz: data, mode });
+      if (mode === 'interactive') {
+        setPendingInteractiveQuiz(data);
       } else {
-        if (mode === 'interactive') {
-          setPendingInteractiveQuiz(data);
-        } else {
-          setLoadedOfflineQuiz(data);
-        }
+        setLoadedOfflineQuiz(data);
       }
     } catch (err: any) {
       setError(err.message);
