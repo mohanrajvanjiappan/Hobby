@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FileText , Gamepad2, MonitorPlay, FileUp } from 'lucide-react';
 import { Quiz } from '../types';
-import { Settings, Play, Loader2, Sparkles, BookOpen, Clock, Mic, Music, Download, Upload, Image as ImageIcon, CheckCircle2, Trash2, Plus } from 'lucide-react';
+import { Settings, Play, Loader2, Sparkles, BookOpen, Clock, Mic, Music, Download, Upload, Image as ImageIcon, CheckCircle2, Trash2, Plus, Palette } from 'lucide-react';
 import { motion } from 'motion/react';
 import { audioSynth } from '../lib/audio';
 import { generateWordSearchGrid } from '../lib/wordSearch';
@@ -78,11 +78,15 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
       console.error("Failed to enrich insights", e);
     } finally {
       setLoading(false);
-      const finalQuiz = { ...quizToEnrich, mode, showBadges, enableMemoryBreak, themeMemoryBreak, enableInsightImages, dynamicColors: enableDynamicColors, rules: rules || undefined };
-      if (mode === 'interactive') {
-        setPendingInteractiveQuiz(finalQuiz);
+      const finalQuiz = { ...quizToEnrich, mode, showBadges, enableMemoryBreak, themeMemoryBreak, memoryBreakImageCount, enableInsightImages, dynamicColors: enableDynamicColors, rules: rules || undefined };
+      if (enableInsightImages && finalQuiz.questions?.some(q => q.insightImageUrl)) {
+        setPreviewQuizData({ quiz: finalQuiz, mode });
       } else {
-        onQuizGenerated(finalQuiz);
+        if (mode === 'interactive') {
+          setPendingInteractiveQuiz(finalQuiz);
+        } else {
+          onQuizGenerated(finalQuiz);
+        }
       }
     }
   };
@@ -113,11 +117,13 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
   const [enableClapping, setEnableClapping] = useState<boolean>(true);
   const [enableMemoryBreak, setEnableMemoryBreak] = useState<boolean>(true);
   const [themeMemoryBreak, setThemeMemoryBreak] = useState<boolean>(false);
+  const [memoryBreakImageCount, setMemoryBreakImageCount] = useState<number>(10);
   const [enableDynamicColors, setEnableDynamicColors] = useState<boolean>(false);
   const [enableInsightImages, setEnableInsightImages] = useState<boolean>(true);
   const [setupMode, setSetupMode] = useState<'quiz' | 'presentation' | 'offline'>('quiz');
   const [presentationContent, setPresentationContent] = useState('');
   const [presentationDuration, setPresentationDuration] = useState(5);
+  const [previewQuizData, setPreviewQuizData] = useState<{quiz: Quiz, mode: 'video'|'interactive'}|null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -317,7 +323,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
     audioSynth.setMusicPreference(musicEnabled);
     
     if (cachedQuiz && ((quizType === 'identify-image' || quizType === 'blurred-image') || quizType === 'multiple-choice')) {
-      const q = { ...cachedQuiz, mode, showBadges, enableClapping, enableMemoryBreak, themeMemoryBreak, enableInsightImages, dynamicColors: enableDynamicColors };
+      const q = { ...cachedQuiz, mode, showBadges, enableClapping, enableMemoryBreak, themeMemoryBreak, memoryBreakImageCount, enableInsightImages, dynamicColors: enableDynamicColors };
       if (mode === 'interactive') {
         setPendingInteractiveQuiz(q);
       } else {
@@ -353,6 +359,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
       data.enableClapping = enableClapping;
       data.enableMemoryBreak = enableMemoryBreak;
       data.themeMemoryBreak = themeMemoryBreak;
+      data.memoryBreakImageCount = memoryBreakImageCount;
       data.dynamicColors = enableDynamicColors;
       data.enableInsightImages = enableInsightImages;
       data.rules = rules || undefined;
@@ -379,10 +386,14 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
         });
       }
 
-      if (mode === 'interactive') {
-        setPendingInteractiveQuiz(data);
+      if (enableInsightImages && data.questions?.some((q: any) => q.insightImageUrl)) {
+        setPreviewQuizData({ quiz: data, mode });
       } else {
-        setLoadedOfflineQuiz(data);
+        if (mode === 'interactive') {
+          setPendingInteractiveQuiz(data);
+        } else {
+          setLoadedOfflineQuiz(data);
+        }
       }
     } catch (err: any) {
       setError(err.message);
@@ -1115,9 +1126,9 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
     };
 
     if (mode === 'video') {
-      setLoadedOfflineQuiz({ ...combinedQuiz, mode: 'video', showBadges, enableMemoryBreak, themeMemoryBreak, enableInsightImages, dynamicColors: enableDynamicColors, rules: rules || undefined });
+      setLoadedOfflineQuiz({ ...combinedQuiz, mode: 'video', showBadges, enableMemoryBreak, themeMemoryBreak, memoryBreakImageCount, enableInsightImages, dynamicColors: enableDynamicColors, rules: rules || undefined });
     } else if (mode === 'interactive') {
-      setPendingInteractiveQuiz({ ...combinedQuiz, mode: 'interactive', showBadges, enableMemoryBreak, themeMemoryBreak, enableInsightImages, dynamicColors: enableDynamicColors, rules: rules || undefined });
+      setPendingInteractiveQuiz({ ...combinedQuiz, mode: 'interactive', showBadges, enableMemoryBreak, themeMemoryBreak, memoryBreakImageCount, enableInsightImages, dynamicColors: enableDynamicColors, rules: rules || undefined });
     } else {
       setLoadedOfflineQuiz(combinedQuiz);
     }
@@ -1298,7 +1309,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             <div className="pt-6 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => handleStartUploadedFiles('interactive')}
+                onClick={() => handleStartUploadedFiles('select')}
                 disabled={uploadedFileList.length === 0}
                 className="w-full py-4 rounded-xl bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/30 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -1418,7 +1429,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
               <button
                 type="button"
                 onClick={() => {
-                  setPendingInteractiveQuiz({ ...loadedOfflineQuiz, mode: 'interactive', showBadges, enableMemoryBreak, themeMemoryBreak, enableInsightImages, dynamicColors: enableDynamicColors, rules: rules || undefined });
+                  setPendingInteractiveQuiz({ ...loadedOfflineQuiz, mode: 'interactive', showBadges, enableMemoryBreak, themeMemoryBreak, memoryBreakImageCount, enableInsightImages, dynamicColors: enableDynamicColors, rules: rules || undefined });
                   setLoadedOfflineQuiz(null);
                 }}
                 className="flex-1 py-4 rounded-xl bg-fuchsia-600 text-white font-bold text-lg hover:bg-fuchsia-700 focus:outline-none focus:ring-4 focus:ring-fuchsia-500/30 transition-all flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-600/20"
@@ -1935,9 +1946,10 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             />
           </div>
           {enableMemoryBreak && (
+            <div className="ml-8 space-y-3">
              <div 
                onClick={() => setThemeMemoryBreak(!themeMemoryBreak)}
-               className="p-3.5 ml-8 bg-gradient-to-r from-purple-50/40 to-fuchsia-50/40 border-2 border-purple-200/50 rounded-xl flex items-center justify-between cursor-pointer hover:border-purple-300 transition-all shadow-sm"
+               className="p-3.5 bg-gradient-to-r from-purple-50/40 to-fuchsia-50/40 border-2 border-purple-200/50 rounded-xl flex items-center justify-between cursor-pointer hover:border-purple-300 transition-all shadow-sm"
              >
                <div className="flex items-center gap-3">
                  <div className="w-8 h-8 rounded-xl bg-purple-400 text-white flex items-center justify-center font-black text-lg shadow-md shadow-purple-400/20">
@@ -1958,7 +1970,61 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                  className="w-4 h-4 text-purple-600 border-purple-300 rounded focus:ring-purple-500 cursor-pointer accent-purple-600"
                />
              </div>
+             
+             <div className="p-4 bg-white border border-slate-200 rounded-xl flex flex-col gap-3 shadow-sm">
+                 <div className="flex items-center justify-between">
+                   <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                     <span className="text-lg">🔢</span> Number of Images
+                   </label>
+                   <span className="text-sm font-black text-purple-600 bg-purple-100 px-3 py-1 rounded-full shadow-inner">{memoryBreakImageCount}</span>
+                 </div>
+                 <input
+                   type="range"
+                   min="5"
+                   max="20"
+                   value={memoryBreakImageCount}
+                   onChange={(e) => setMemoryBreakImageCount(parseInt(e.target.value))}
+                   className="w-full accent-purple-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                 />
+                 <div className="flex justify-between text-xs text-slate-400 font-medium px-1">
+                   <span>5</span>
+                   <span>10</span>
+                   <span>15</span>
+                   <span>20</span>
+                 </div>
+             </div>
+            </div>
           )}
+
+          {/* Dynamic Colors Toggle */}
+          <div 
+            onClick={() => setEnableDynamicColors(!enableDynamicColors)}
+            className="p-3.5 bg-gradient-to-r from-blue-50/80 to-cyan-50/80 border-2 border-blue-200/80 rounded-xl flex items-center justify-between cursor-pointer hover:border-blue-300 transition-all shadow-sm mt-3"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-500 text-white flex items-center justify-center font-black text-lg shadow-md shadow-blue-500/20">
+                <Palette className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex flex-col text-left">
+                <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  Dynamic Colors
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-200/80 text-blue-900 border border-blue-300/50">
+                    Video Mode
+                  </span>
+                </div>
+                <div className="text-xs font-semibold text-blue-600/90 leading-tight mt-0.5">
+                  Multi-colored backgrounds in video quiz
+                </div>
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={enableDynamicColors}
+              onChange={(e) => setEnableDynamicColors(e.target.checked)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-5 h-5 text-blue-600 border-blue-300 rounded focus:ring-blue-500 cursor-pointer accent-blue-600"
+            />
+          </div>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-12 pt-6 border-t-2 border-slate-100">
             <button

@@ -98,6 +98,7 @@ export interface Quiz {
   enableClapping?: boolean;
   enableMemoryBreak?: boolean;
   themeMemoryBreak?: boolean;
+  memoryBreakImageCount?: number;
   memoryBreakEmojis?: string[];
   enableInsightImages?: boolean;
   isMultipleFilesLoaded?: boolean;

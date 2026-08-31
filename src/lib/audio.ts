@@ -481,11 +481,29 @@ class AudioSynth {
       }
       
       // Fine-tuning for a more human-like expressive delivery
-      utterance.rate = 0.92; // Slightly slower for better articulation and expressiveness
-      if (this.voicePreference === 'female') {
-        utterance.pitch = 1.15; // Slightly higher pitch for a more enthusiastic/expressive female tone
+      let baseRate = 0.92;
+      let basePitch = this.voicePreference === 'female' ? 1.15 : 1.0;
+
+      // Detect emotion from punctuation or casing to add dynamic enthusiasm
+      const isEnthusiastic = text.includes('!') || text.toUpperCase() === text && text.length > 2;
+      const isQuestion = text.includes('?');
+
+      // Add a slight randomization (jitter) so it doesn't sound completely uniform every time
+      const pitchJitter = (Math.random() * 0.1) - 0.05; 
+      const rateJitter = (Math.random() * 0.06) - 0.03;
+
+      if (isEnthusiastic) {
+        // More enthusiastic: higher pitch and slightly faster
+        utterance.pitch = Math.min(2, basePitch + 0.25 + pitchJitter);
+        utterance.rate = Math.min(2, baseRate + 0.1 + rateJitter);
+      } else if (isQuestion) {
+        // Questions: slight pitch up
+        utterance.pitch = Math.min(2, basePitch + 0.1 + pitchJitter);
+        utterance.rate = baseRate + rateJitter;
       } else {
-        utterance.pitch = 1.0; 
+        // Normal delivery
+        utterance.pitch = basePitch + pitchJitter;
+        utterance.rate = baseRate + rateJitter;
       }
       
       window.speechSynthesis.speak(utterance);
