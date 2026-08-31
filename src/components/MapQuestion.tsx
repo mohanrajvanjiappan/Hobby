@@ -6,6 +6,7 @@ import L from 'leaflet';
 interface MapQuestionProps {
   question: QuizQuestion;
   timeLeft: number;
+  isInteractiveMode?: boolean;
 }
 
 function MapController({ targetBbox, parentBbox, timeLeft, isReveal }: { targetBbox: any, parentBbox: any, timeLeft: number, isReveal: boolean }) {
@@ -43,7 +44,7 @@ function MapController({ targetBbox, parentBbox, timeLeft, isReveal }: { targetB
   return null;
 }
 
-export default function MapQuestion({ question, timeLeft }: MapQuestionProps) {
+export default function MapQuestion({ question, timeLeft, isInteractiveMode = false }: MapQuestionProps) {
   const [geoData, setGeoData] = useState<any>(null);
   const [targetBbox, setTargetBbox] = useState<L.LatLngBoundsExpression | null>(null);
   const [parentBbox, setParentBbox] = useState<L.LatLngBoundsExpression | null>(null);
@@ -114,16 +115,16 @@ export default function MapQuestion({ question, timeLeft }: MapQuestionProps) {
         center={[20, 0]} 
         zoom={2} 
         style={{ width: '100%', height: '100%' }}
-        zoomControl={false}
+        zoomControl={isInteractiveMode}
         attributionControl={false}
-        dragging={false}
-        scrollWheelZoom={false}
-        doubleClickZoom={false}
+        dragging={isInteractiveMode}
+        scrollWheelZoom={isInteractiveMode}
+        doubleClickZoom={isInteractiveMode}
         maxBounds={[[-90, -180], [90, 180]]}
         maxBoundsViscosity={1.0}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png"
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
           noWrap={true}
           bounds={[[-90, -180], [90, 180]]}
         />

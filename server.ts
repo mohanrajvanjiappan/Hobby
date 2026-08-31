@@ -80,11 +80,108 @@ const generateWordSearchGrid = (words: string[]) => {
   return { grid, wordLocations, wordsToFind: wordLocations.map(w => w.word) };
 };
 
+
+import { search } from 'duckduckgo-images-api';
+async function fetchImageForQuery(query: string): Promise<string | null> {
+  let imageUrlsToTry: string[] = [];
+  try {
+    const searchRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json`);
+    const searchData = await searchRes.json();
+    const title = searchData.query?.search?.[0]?.title;
+    if (title) {
+      const imgRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles=${encodeURIComponent(title)}`);
+      const imgData = await imgRes.json();
+      const pages = imgData.query?.pages;
+      if (pages) {
+        const pageId = Object.keys(pages)[0];
+        const source = pages[pageId]?.original?.source;
+        if (source) imageUrlsToTry.push(source);
+      }
+    }
+  } catch(e) {}
+  
+    try {
+    const ddgImages = await searchDuckDuckGoImages(query + " high quality -watermark");
+    imageUrlsToTry.push(...ddgImages);
+  } catch(e) {}
+  
+  for (const targetUrl of imageUrlsToTry) {
+    if (!targetUrl) continue;
+    try {
+      const fetchRes = await fetch(targetUrl, { 
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(3000)
+      });
+      if (fetchRes.ok) {
+        const arrayBuffer = await fetchRes.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64 = buffer.toString('base64');
+        const mimeType = fetchRes.headers.get('content-type') || 'image/jpeg';
+        if (mimeType.startsWith('image/') || mimeType === 'application/octet-stream') {
+          return `data:${mimeType === 'application/octet-stream' ? 'image/jpeg' : mimeType};base64,${base64}`;
+        }
+      }
+    } catch (err) {}
+  }
+  return null;
+}
+
+
+async function searchDuckDuckGoImages(query: string): Promise<string[]> {
+  const imageUrls: string[] = [];
+  try {
+    const res1 = await fetch(`https://duckduckgo.com/?q=${encodeURIComponent(query)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const text1 = await res1.text();
+    const match = text1.match(/vqd="([^"]+)"/);
+    if (!match) return imageUrls;
+    const vqd = match[1];
+
+    const res2 = await fetch(`https://duckduckgo.com/i.js?q=${encodeURIComponent(query)}&o=json&vqd=${vqd}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const data = await res2.json();
+    if (data && data.results) {
+      for (const res of data.results) {
+        if (res.image) imageUrls.push(res.image);
+      }
+    }
+  } catch (e) {
+    console.error("DDG search failed", e);
+  }
+  return imageUrls;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: "50mb" }));
+
+  app.post("/api/enrich-insights", async (req, res) => {
+    try {
+      const { questions, enableInsightImages } = req.body;
+      if (!questions || !Array.isArray(questions)) return res.json({ questions: [] });
+      
+      if (enableInsightImages === false) return res.json({ questions });
+      const enrichedQuestions = await Promise.all(questions.map(async (q: any) => {
+        if (q.insight && !q.insightImageUrl) {
+            const queryToSearch = q.insightImageSearchQuery || `${req.body.topic ? req.body.topic + ' ' : ''}${q.correctAnswer || q.answer || ''}`.trim();
+            const img = await fetchImageForQuery(queryToSearch);
+            if (img) {
+              q.insightImageUrl = img;
+            }
+          }
+        return q;
+      }));
+      
+      res.json({ questions: enrichedQuestions });
+    } catch(e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
 
   
   app.post("/api/generate-presentation", async (req, res) => {
@@ -121,8 +218,15 @@ ${textContent}
 """
 `;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
+      
+      let response;
+      let retries = 3;
+      const modelsToTry = ["gemini-3.6-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"];
+      let currentModelIndex = 0;
+      while (retries > 0) {
+        try {
+          response = await ai.models.generateContent({
+        model: modelsToTry[currentModelIndex],
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -139,6 +243,8 @@ ${textContent}
                     question: { type: Type.STRING },
                     clues: { type: Type.ARRAY, items: { type: Type.STRING } },
                     insight: { type: Type.STRING },
+                    insightImageSearchQuery: { type: Type.STRING, description: "Extract 2-4 highly relevant keywords from the insight text and the main topic to find a highly accurate image. ONLY use visual nouns (e.g. 'Eiffel Tower Paris', 'Golden Retriever dog'). Do NOT use full sentences or verbs." },
+        blurTechnique: { type: Type.STRING, description: "For blurred-image quizzes. Choose a blur style: 'heavy-blur', 'pixelated-blur', 'grayscale-blur', or 'normal-blur'." },
                     timeLimit: { type: Type.NUMBER },
                   },
                   required: ["question", "clues", "insight", "timeLimit"]
@@ -150,7 +256,29 @@ ${textContent}
         }
       });
 
-      const data = JSON.parse(response.text || "{}");
+                break; // Success, exit retry loop
+        } catch (error: any) {
+          console.error(`Presentation generation attempt failed with ${modelsToTry[currentModelIndex]}: ${JSON.stringify(error)}`);
+          if (error.status === 429 || error.status === 404 || error?.message?.includes("429") || error?.message?.includes("404") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED") {
+            if (currentModelIndex < modelsToTry.length - 1) {
+              currentModelIndex++;
+              console.log(`Falling back to ${modelsToTry[currentModelIndex]}`);
+              continue;
+            }
+          }
+          retries--;
+          if (retries === 0) {
+            if (error.status === 429 || error.status === 404 || error?.message?.includes("429") || error?.message?.includes("404") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED") {
+              throw new Error("You have reached the AI generation rate limit across all available models. Please wait about a minute and try again.");
+            }
+            throw error;
+          }
+          await new Promise(resolve => setTimeout(resolve, 3000)); // wait 3 seconds before retry
+        }
+      }
+
+      const data = JSON.parse(response?.text || "{}");
+
       
       const presentation = {
         title: data.title || "Presentation",
@@ -168,16 +296,210 @@ ${textContent}
         quotes: []
       };
 
+      
+      // Enrich insights for presentation
+      if (req.body.enableInsightImages !== false && presentation.questions && Array.isArray(presentation.questions)) {
+        presentation.questions = await Promise.all(presentation.questions.map(async (q: any) => {
+          if (q.insight && !q.insightImageUrl) {
+            const queryToSearch = q.insightImageSearchQuery || `${req.body.topic ? req.body.topic + ' ' : ''}${q.correctAnswer || q.answer || ''}`.trim();
+            const img = await fetchImageForQuery(queryToSearch);
+            if (img) {
+              q.insightImageUrl = img;
+            }
+          }
+          return q;
+        }));
+      }
+
       res.json(presentation);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Presentation generation error:", error);
-      res.status(500).json({ error: "Failed to generate presentation." });
+      res.status(500).json({ error: error.message || "Failed to generate presentation." });
+    }
+  });
+
+  app.post("/api/cache-json-images", async (req, res) => {
+    try {
+      const { items } = req.body;
+      if (!items || !Array.isArray(items)) {
+        return res.status(400).json({ error: "Invalid items array." });
+      }
+
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(500).json({ error: "Gemini API key is not configured." });
+      }
+      
+      const ai = new GoogleGenAI({
+        apiKey: process.env.GEMINI_API_KEY,
+        httpOptions: { headers: { "User-Agent": "aistudio-build" } },
+      });
+
+      // 1. First use Gemini to generate the BEST image search queries for each item
+      const prompt = `You are an expert at generating image search queries.
+For each item in the following list, your task is to provide the BEST, highly specific Google Image Search query to find a visually stunning and highly relevant background image for the quiz question. 
+If the question is an abstract concept (like a logic puzzle or math question) where an image would not be helpful, or if the question explicitly asks 'what is the name of this object' (meaning the image shouldn't be revealed beforehand), set the query to null. 
+Ensure queries fetch EXACTLY the intended subject (e.g., 'Taj Mahal high resolution daytime' or 'Elephanta Caves exterior wide shot'). Avoid generic terms.
+
+Items:
+${JSON.stringify(items.map((i: any) => ({ id: i.id, question: i.question_text || i.brand_name || i.name, answer: i.brand_name || i.name })))}
+
+Return a JSON array of objects, where each object has 'id' (matching the item) and 'query' (the highly specific image search query, or null if irrelevant).`;
+
+      let searchQueries: any[] = [];
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-3.1-flash-lite",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  query: { type: Type.STRING, description: "Highly specific image search query, or null if no image is needed." }
+                },
+                required: ["id"]
+              }
+            }
+          }
+        });
+        const text = response?.text;
+        if (text) {
+          searchQueries = JSON.parse(text);
+        }
+      } catch (e) {
+        console.error("Failed to generate search queries:", e);
+      }
+
+      // 2. Map queries to items and fetch images
+            const cachedItems = [];
+      for (const item of items) {
+        let imageUrlsToTry: string[] = [];
+        
+        if (item.image_url) {
+          imageUrlsToTry.push(item.image_url);
+        } else {
+          // Find the generated query for this item
+          const matchedQueryObj = searchQueries.find((sq: any) => sq.id == item.id);
+          const query = matchedQueryObj?.query || item.brand_name || item.name;
+          
+          if (query && query !== 'null') {
+            try {
+              const searchRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json`, {
+                headers: { "User-Agent": "aistudio-build/1.0 (vanjimohan@gmail.com)" }
+              });
+              if (!searchRes.ok) throw new Error(`Wikipedia search HTTP ${searchRes.status}`);
+              
+              const searchData = await searchRes.json();
+              const title = searchData.query?.search?.[0]?.title;
+              
+              if (title) {
+                const imgRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles=${encodeURIComponent(title)}`, {
+                  headers: { "User-Agent": "aistudio-build/1.0 (vanjimohan@gmail.com)" }
+                });
+                if (imgRes.ok) {
+                  const imgData = await imgRes.json();
+                  const pages = imgData.query?.pages;
+                  if (pages) {
+                    const pageId = Object.keys(pages)[0];
+                    const source = pages[pageId]?.original?.source;
+                    if (source) {
+                      imageUrlsToTry.push(source);
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              console.error("Wikipedia search failed for", query, e);
+            }
+            
+            // Fallback to Google Image Search if Wikipedia fails or we want more options
+            if (imageUrlsToTry.length === 0) {
+                            try {
+              const ddgImages = await searchDuckDuckGoImages(query);
+              imageUrlsToTry.push(...ddgImages);
+            } catch (e) {
+              console.error("Failed to fetch image for", query, e);
+            }
+            }
+          }
+        }
+
+        // Try downloading one of the discovered URLs
+        let fetchedSuccessfully = false;
+        for (const targetUrl of imageUrlsToTry) {
+           if (fetchedSuccessfully) break;
+           try {
+             const fetchRes = await fetch(targetUrl, { 
+                headers: { "User-Agent": "Mozilla/5.0" },
+                signal: AbortSignal.timeout(5000)
+             });
+             if (fetchRes.ok) {
+               const arrayBuffer = await fetchRes.arrayBuffer();
+               const buffer = Buffer.from(arrayBuffer);
+               const base64 = buffer.toString('base64');
+               const mimeType = fetchRes.headers.get('content-type') || 'image/jpeg';
+               if (mimeType.startsWith('image/') || mimeType === 'application/octet-stream') {
+                 item.image_base64 = `data:${mimeType === 'application/octet-stream' ? 'image/jpeg' : mimeType};base64,${base64}`;
+                 item.image_url = targetUrl; // Save the successful URL
+                 fetchedSuccessfully = true;
+               }
+             }
+           } catch (e) {
+             console.error("Failed to cache image from:", targetUrl, e);
+           }
+        }
+        
+        cachedItems.push(item);
+        
+        // Add a small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      res.json({ items: cachedItems });
+    } catch (error: any) {
+      console.error("Cache images error:", error);
+      res.status(500).json({ error: error.message || "Failed to cache images." });
+    }
+  });
+
+  
+  app.post("/api/fix-json", async (req, res) => {
+    try {
+      const { text } = req.body;
+      if (!text) {
+        return res.status(400).json({ error: "No text provided" });
+      }
+
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(500).json({ error: "Gemini API key is required" });
+      }
+
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: "The following text is a malformed JSON file. Fix it and return ONLY valid JSON without any markdown formatting. Text:\n" + text,
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.1,
+        }
+      });
+      
+      let fixedText = response.text || "";
+      
+      const parsed = JSON.parse(fixedText);
+      res.json(parsed);
+    } catch (error) {
+      console.error("Error fixing JSON:", error);
+      res.status(500).json({ error: "Failed to fix JSON" });
     }
   });
 
   app.post("/api/generate-quiz", async (req, res) => {
     try {
-      let { topic, numQuestions, difficulty, quizType = 'multiple-choice', customItems, identifyMultiChoice = true } = req.body;
+      let { topic, numQuestions, difficulty, quizType = 'multiple-choice', customItems, identifyMultiChoice = true, includeImages = false, themeMemoryBreak = false } = req.body;
       if (!topic || !topic.trim()) {
         topic = 'Item';
       }
@@ -196,15 +518,19 @@ ${textContent}
       });
 
       let targetNumQuestions = numQuestions;
-      if (quizType === 'identify-image') {
+      if ((quizType === 'identify-image' || quizType === 'blurred-image')) {
         targetNumQuestions = numQuestions + 5; // Generate extra questions in case image fetching fails
       }
       let contents = `Generate a kids quiz about "${topic}". The difficulty should be ${difficulty}. Generate ${targetNumQuestions} questions.`;
       if (customItems && customItems.length > 0) {
-        if (identifyMultiChoice) {
-          contents = `This is an 'Identify the Image' round based on custom items. There are ${customItems.length} items. Generate exactly 1 question for each item. For each item: - The 'id' MUST exactly match the provided item id. - The 'question' should be 'Identify this ${topic === 'Item' ? 'Item' : topic}'. - The 'correctAnswer' MUST exactly match the provided item name. - Generate 3 plausible but incorrect options. If the items share a common category, use that category for the incorrect options. The final 'options' array must contain the correct answer and the 3 incorrect options, shuffled. - 'timeLimit' should be 10 seconds. Here are the items: ${JSON.stringify(customItems)}`;
+        if ((quizType === 'identify-image' || quizType === 'blurred-image')) {
+          if (identifyMultiChoice) {
+            contents = `This is an 'Identify the Image' round based on custom items. There are ${customItems.length} items. Generate exactly 1 question for each item. For each item: - The 'id' MUST exactly match the provided item id. - The 'question' should be 'Identify this ${topic === 'Item' ? 'Item' : topic}'. - The 'correctAnswer' MUST exactly match the provided item name. - Generate 3 plausible but incorrect options. If the items share a common category, use that category for the incorrect options. The final 'options' array must contain the correct answer and the 3 incorrect options, shuffled. - 'timeLimit' should be 10 seconds. Here are the items: ${JSON.stringify(customItems)}`;
+          } else {
+            contents = `This is an 'Identify the Image' round based on custom items. There are ${customItems.length} items. Generate exactly 1 question for each item. For each item: - The 'id' MUST exactly match the provided item id. - The 'question' should be 'Identify this ${topic === 'Item' ? 'Item' : topic}'. - The 'correctAnswer' MUST exactly match the provided item name. DO NOT generate options. - 'timeLimit' should be 10 seconds. Here are the items: ${JSON.stringify(customItems)}`;
+          }
         } else {
-          contents = `This is an 'Identify the Image' round based on custom items. There are ${customItems.length} items. Generate exactly 1 question for each item. For each item: - The 'id' MUST exactly match the provided item id. - The 'question' should be 'Identify this ${topic === 'Item' ? 'Item' : topic}'. - The 'correctAnswer' MUST exactly match the provided item name. DO NOT generate options. - 'timeLimit' should be 10 seconds. Here are the items: ${JSON.stringify(customItems)}`;
+          contents = `This is a multiple choice quiz based on custom items. There are ${customItems.length} items. Generate exactly 1 question for each item. For each item: - The 'id' MUST exactly match the provided item id. - Create an engaging question about the item (whose name is provided). - The 'correctAnswer' MUST exactly match the provided item name. - Generate 3 plausible but incorrect options. The final 'options' array must contain the correct answer and the 3 incorrect options, shuffled. - 'timeLimit' should be 10 seconds. Here are the items: ${JSON.stringify(customItems)}`;
         }
       }
       
@@ -212,20 +538,22 @@ ${textContent}
         question: { type: Type.STRING, description: "The quiz question text. CRITICAL: If the quiz is to identify a movie/show, DO NOT mention the movie/show name in the question text." },
         correctAnswer: { type: Type.STRING, description: "The exact correct answer string." },
         timeLimit: { type: Type.NUMBER, description: "Time limit in seconds (usually 10, but use 20 for find-in-map rounds)." },
-        imageSearchQuery: { type: Type.STRING, description: "If the quiz involves images, provide a highly specific Google Image Search query to fetch an accurate image. CRITICAL: Ensure the query fetches exactly the intended subject. Use highly specific terms (e.g., '2023 Ford Mustang car side view' not 'Mustang', 'Golden Retriever dog' not 'Dog'). Avoid generic terms that return unrelated images. CRITICAL RULE FOR MOVIES/TV SHOWS: You ABSOLUTELY MUST NOT search for the movie/show's poster. Instead, search for a lead actor portrait or a general object." }
+        imageSearchQuery: { type: Type.STRING, description: "If the quiz involves images, provide a highly specific Google Image Search query to fetch an accurate image. CRITICAL: Ensure the query fetches exactly the intended subject. Use highly specific terms (e.g., '2023 Ford Mustang car side view' not 'Mustang', 'Golden Retriever dog' not 'Dog'). Avoid generic terms that return unrelated images. CRITICAL RULE FOR MOVIES/TV SHOWS: You ABSOLUTELY MUST NOT search for the movie/show's poster. Instead, search for a lead actor portrait or a general object." },
+        insight: { type: Type.STRING, description: "A fun 'Did you know?' fact related to the correct answer. Keep it very short (1 sentence)." },
+        insightImageSearchQuery: { type: Type.STRING, description: "Extract 2-4 highly relevant keywords from the insight text and the main topic to find a highly accurate image. ONLY use visual nouns (e.g. 'Eiffel Tower Paris', 'Golden Retriever dog'). Do NOT use full sentences or verbs." }
       };
       if (customItems && customItems.length > 0) { questionSchemaProps.id = { type: Type.STRING, description: "The exact ID of the item" }; }
       let requiredQuestionProps = ["question", "correctAnswer", "timeLimit"];
       if (customItems && customItems.length > 0) { requiredQuestionProps.push("id"); }
 
-      if (quizType !== 'detective' && quizType !== 'jumbled-letters' && quizType !== 'match-the-following' && quizType !== 'combat-mode' && quizType !== 'identify-image') {
+      if (quizType !== 'detective' && quizType !== 'jumbled-letters' && quizType !== 'match-the-following' && quizType !== 'combat-mode' && quizType !== 'identify-image' && quizType !== 'blurred-image' && quizType !== 'a-to-z') {
         requiredQuestionProps.push("options");
         questionSchemaProps.options = {
           type: Type.ARRAY,
           items: { type: Type.STRING },
           description: "4 multiple choice options."
         };
-      } else if (quizType === 'identify-image') {
+      } else if ((quizType === 'identify-image' || quizType === 'blurred-image')) {
         if (identifyMultiChoice) {
           requiredQuestionProps.push("options");
           questionSchemaProps.options = {
@@ -236,7 +564,7 @@ ${textContent}
         }
       }
 
-      if (quizType === 'identify-image') {
+      if ((quizType === 'identify-image' || quizType === 'blurred-image')) {
         if (identifyMultiChoice) {
           contents += ` This is an 'Identify the Image' round. For each question, provide a 'question' which is just 'Identify this [topic/category]', the 'correctAnswer', and 4 'options'. 
 CRITICAL RULES FOR ACCURACY:
@@ -332,24 +660,34 @@ CRITICAL RULES FOR ACCURACY:
         requiredQuestionProps.push("wordsToFind");
       } else if (quizType === 'mega-quiz') {
         contents += ` This is a Mega Quiz. Generate a wide mix of questions from all possible categories (history, science, geography, pop culture, sports, arts, literature, movies, logic, etc). For each question, provide 4 options. Ensure the questions are diverse and fun.`;
+      } else if (quizType === 'a-to-z') {
+        contents += ` This is an 'A to Z Challenge' round. Generate exactly 26 questions, one for each letter of the English alphabet from A to Z, in alphabetical order. For each question, the correct answer MUST start with that specific letter and be strongly related to the theme '${topic}'. The correct answer can be a single word or a short phrase (up to 5 words maximum), as long as the first word starts with the required letter. The 'question' should literally be: 'Name a ${topic} starting with the letter [Letter]'. Provide an interesting 'insight' and an 'imageSearchQuery' (if includeImages is true) for the correct answer. Do NOT provide multiple choice options.`;
+        if (includeImages) {
+          contents += ` CRITICAL: Provide an 'imageSearchQuery' to fetch a highly specific, high-quality photo that relates to the correct answer. Add terms like "-watermark -stock", "high quality", "clear photo", or "isolated" to ensure good results.`;
+        }
       } else if (quizType === 'rapid-fire') {
         contents += ` This is a 'Rapid Fire' round. Provide short, snappy questions and 4 options each. The questions should be quick to read and answer.`;
       } else {
         contents += ` This is a multiple choice quiz. For each question, provide 4 options.`;
+        if (includeImages) {
+          contents += ` CRITICAL: Provide an 'imageSearchQuery' to fetch a highly specific, high-quality photo that relates to the correct answer. Add terms like "-watermark -stock", "high quality", "clear photo", or "isolated" to ensure good results.`;
+        }
       }
 
       let response;
       let retries = 3;
+      const modelsToTry = ["gemini-3.6-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"];
+      let currentModelIndex = 0;
+
       while (retries > 0) {
         try {
           response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: modelsToTry[currentModelIndex],
             contents,
             config: {
               responseMimeType: "application/json",
-              responseSchema: {
-                type: Type.OBJECT,
-                properties: {
+              responseSchema: (() => {
+                const props: any = {
                   title: { type: Type.STRING, description: "A catchy title for the quiz video." },
                   theme: {
                     type: Type.OBJECT,
@@ -368,20 +706,40 @@ CRITICAL RULES FOR ACCURACY:
                       required: requiredQuestionProps
                     }
                   }
-                },
-                required: ["title", "theme", "questions"]
-              },
+                };
+                if (themeMemoryBreak) {
+                  props.memoryBreakEmojis = {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "20 distinct, unique emoji characters highly related to the quiz topic. ONLY return the single emoji characters (e.g., '🍎'). Do not include any text."
+                  };
+                }
+                return {
+                  type: Type.OBJECT,
+                  properties: props,
+                  required: ["title", "theme", "questions"]
+                };
+              })(),
             },
           });
           break; // Success, exit retry loop
         } catch (error: any) {
-          console.error(`Attempt failed: ${error.message}`);
-          if (error.status === 429 || error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED") {
-            throw new Error("You have reached the AI generation rate limit. Please wait about a minute and try again.");
+          console.error(`Attempt failed with ${modelsToTry[currentModelIndex]}: ${JSON.stringify(error)}`);
+          if (error.status === 429 || error.status === 404 || error?.message?.includes("429") || error?.message?.includes("404") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED") {
+            if (currentModelIndex < modelsToTry.length - 1) {
+              currentModelIndex++;
+              console.log(`Falling back to ${modelsToTry[currentModelIndex]}`);
+              continue;
+            }
           }
           retries--;
-          if (retries === 0) throw error;
-          await new Promise(resolve => setTimeout(resolve, 2000)); // wait 2 seconds before retry
+          if (retries === 0) {
+            if (error.status === 429 || error.status === 404 || error?.message?.includes("429") || error?.message?.includes("404") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED") {
+              throw new Error("You have reached the AI generation rate limit across all available models. Please wait about a minute and try again.");
+            }
+            throw error;
+          }
+          await new Promise(resolve => setTimeout(resolve, 3000)); // wait 3 seconds before retry
         }
       }
 
@@ -417,7 +775,7 @@ CRITICAL RULES FOR ACCURACY:
         quizData.quotes = [];
       }
 
-      if ((!customItems || customItems.length === 0) && (topic.toLowerCase().startsWith("identify") || quizType === 'identify-image')) {
+      if ((!customItems || customItems.length === 0) && (topic.toLowerCase().startsWith("identify") || (quizType === 'identify-image' || quizType === 'blurred-image') || includeImages)) {
         for (const q of quizData.questions) {
           let base64Image = null;
           let imageUrlsToTry = [];
@@ -448,15 +806,9 @@ CRITICAL RULES FOR ACCURACY:
 
           // 2. Fallback to Google Image Search if Wikipedia fails or we want backups
           if (q.imageSearchQuery) {
-            try {
-              const options = { page: 0, safe: false, additional_params: { hl: 'en' } };
-              const images = await google.image(q.imageSearchQuery, options);
-              if (images && images.length > 0) {
-                for (const img of images) {
-                  if (img.url) imageUrlsToTry.push(img.url);
-                  if (img.preview?.url) imageUrlsToTry.push(img.preview.url);
-                }
-              }
+                        try {
+              const ddgImages = await searchDuckDuckGoImages(q.imageSearchQuery);
+              imageUrlsToTry.push(...ddgImages);
             } catch (e) {
               console.error("Failed to fetch image for", q.imageSearchQuery, e);
             }
@@ -484,16 +836,17 @@ CRITICAL RULES FOR ACCURACY:
               continue;
             }
           }
-
           if (base64Image) {
             q.imageUrl = base64Image;
             q.imagePreviewUrl = base64Image;
           }
         }
         
-        quizData.questions = quizData.questions.filter(q => q.imageUrl);
-        if (quizData.questions.length === 0) {
-          return res.status(500).json({ error: "Failed to fetch accurate images for the requested topic. Please try a different topic or less obscure subjects." });
+        if ((quizType === 'identify-image' || quizType === 'blurred-image') || topic.toLowerCase().startsWith("identify")) {
+          quizData.questions = quizData.questions.filter(q => q.imageUrl);
+          if (quizData.questions.length === 0) {
+            return res.status(500).json({ error: "Failed to fetch accurate images for the requested topic. Please try a different topic or less obscure subjects." });
+          }
         }
         quizData.questions = quizData.questions.slice(0, numQuestions);
       }
@@ -507,6 +860,21 @@ CRITICAL RULES FOR ACCURACY:
             q.wordsToFind = wordsToFind;
           }
         }
+      }
+
+      
+      // Enrich insights before returning
+      if (req.body.enableInsightImages !== false && quizData.questions && Array.isArray(quizData.questions)) {
+        quizData.questions = await Promise.all(quizData.questions.map(async (q: any) => {
+          if (q.insight && !q.insightImageUrl) {
+            const queryToSearch = q.insightImageSearchQuery || `${req.body.topic ? req.body.topic + ' ' : ''}${q.correctAnswer || q.answer || ''}`.trim();
+            const img = await fetchImageForQuery(queryToSearch);
+            if (img) {
+              q.insightImageUrl = img;
+            }
+          }
+          return q;
+        }));
       }
 
       res.json(quizData);

@@ -47,6 +47,7 @@ export interface QuizQuestion {
   grid?: string[][];
   wordsToFind?: string[];
   wordLocations?: WordSearchLocation[];
+  blurTechnique?: string;
   correctAnswer: string;
   playerIndex?: number;
   rapidFireSet?: string;
@@ -56,6 +57,7 @@ export interface QuizQuestion {
   brand_name?: string;
   timeLimit: number;
   imageUrl?: string;
+  insightImageUrl?: string;
   imagePreviewUrl?: string;
 }
 
@@ -82,6 +84,7 @@ export interface PlayerDetails {
 
 export interface Quiz {
   isOfflineMode?: boolean;
+  dynamicColors?: boolean;
   isMultiplayer?: boolean;
   mode?: 'video' | 'interactive';
   teamName?: string;
@@ -93,6 +96,10 @@ export interface Quiz {
   showFrames?: boolean;
   showBadges?: boolean;
   enableClapping?: boolean;
+  enableMemoryBreak?: boolean;
+  themeMemoryBreak?: boolean;
+  memoryBreakEmojis?: string[];
+  enableInsightImages?: boolean;
   isMultipleFilesLoaded?: boolean;
   players?: PlayerDetails[];
   title: string;

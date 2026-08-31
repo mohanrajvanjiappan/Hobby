@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FileText , Gamepad2, MonitorPlay, FileUp } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { Quiz } from '../types';
 import { Settings, Play, Loader2, Sparkles, BookOpen, Clock, Mic, Music, Download, Upload, Image as ImageIcon, CheckCircle2, Trash2, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -115,7 +115,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
   const [themeMemoryBreak, setThemeMemoryBreak] = useState<boolean>(false);
   const [enableDynamicColors, setEnableDynamicColors] = useState<boolean>(false);
   const [enableInsightImages, setEnableInsightImages] = useState<boolean>(true);
-  const [setupMode, setSetupMode] = useState<'quiz' | 'presentation' | 'offline'>('quiz');
+  const [setupMode, setSetupMode] = useState<'quiz' | 'presentation'>('quiz');
   const [presentationContent, setPresentationContent] = useState('');
   const [presentationDuration, setPresentationDuration] = useState(5);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1179,135 +1179,38 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
   const isGenerateDisabled = loading || hasMissingTopic || hasMissingCustomImages || hasMissingJsonItems || hasMissingCache;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row p-4 md:p-8 lg:p-12 gap-8 font-sans items-start justify-center">
+    <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-6xl flex flex-col lg:flex-row bg-white rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden border border-slate-100/60 ring-1 ring-slate-900/5"
+        className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-neutral-100"
       >
-        <div className="lg:w-2/5 xl:w-1/3 bg-gradient-to-br from-indigo-500 via-violet-600 to-purple-700 p-10 lg:p-12 text-white flex flex-col relative overflow-hidden shrink-0">
-          <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
-          <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
-          
-          <div className="relative z-10 flex-1">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-[1.5rem] bg-white/10 mb-8 backdrop-blur-md shadow-inner shadow-white/20 border border-white/20">
-              <Sparkles className="w-10 h-10 text-white drop-shadow-md" />
-            </div>
-            <h1 className="text-4xl lg:text-5xl font-black text-white mb-4 tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>Content<br/>Studio</h1>
-            <p className="text-indigo-100 text-lg leading-relaxed mb-12 font-medium opacity-90">Design beautiful, interactive YouTube quizzes and presentations with AI.</p>
-            
-            <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => setSetupMode('quiz')}
-                className={`flex items-center gap-4 px-6 py-4 text-left font-bold rounded-2xl transition-all duration-300 border-2 ${setupMode === 'quiz' ? 'bg-white text-indigo-600 border-white shadow-[0_10px_30px_rgba(0,0,0,0.1)] scale-[1.02]' : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20'}`}
-              >
-                <div className={`p-2 rounded-xl ${setupMode === 'quiz' ? 'bg-indigo-100' : 'bg-white/10'}`}><Gamepad2 className="w-6 h-6" /></div>
-                <div className="flex flex-col"><span className="text-sm opacity-80 uppercase tracking-widest text-[10px]">Create</span><span className="text-lg">Quiz Maker</span></div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSetupMode('presentation')}
-                className={`flex items-center gap-4 px-6 py-4 text-left font-bold rounded-2xl transition-all duration-300 border-2 ${setupMode === 'presentation' ? 'bg-white text-indigo-600 border-white shadow-[0_10px_30px_rgba(0,0,0,0.1)] scale-[1.02]' : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20'}`}
-              >
-                <div className={`p-2 rounded-xl ${setupMode === 'presentation' ? 'bg-indigo-100' : 'bg-white/10'}`}><MonitorPlay className="w-6 h-6" /></div>
-                <div className="flex flex-col"><span className="text-sm opacity-80 uppercase tracking-widest text-[10px]">Create</span><span className="text-lg">Presentation</span></div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSetupMode('offline')}
-                className={`flex items-center gap-4 px-6 py-4 text-left font-bold rounded-2xl transition-all duration-300 border-2 ${setupMode === 'offline' ? 'bg-white text-indigo-600 border-white shadow-[0_10px_30px_rgba(0,0,0,0.1)] scale-[1.02]' : 'bg-white/5 border-white/10 text-white hover:bg-white/10 hover:border-white/20'}`}
-              >
-                <div className={`p-2 rounded-xl ${setupMode === 'offline' ? 'bg-indigo-100' : 'bg-white/10'}`}><FileUp className="w-6 h-6" /></div>
-                <div className="flex flex-col"><span className="text-sm opacity-80 uppercase tracking-widest text-[10px]">Import</span><span className="text-lg">Offline Custom</span></div>
-              </button>
-            </div>
+        <div className="bg-indigo-600 p-8 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/20 mb-4 backdrop-blur-sm">
+            <Sparkles className="w-8 h-8 text-white" />
           </div>
+          <h1 className="text-3xl font-bold text-white mb-2">Content Generator</h1>
+          <p className="text-indigo-100 text-sm">Generate engaging YouTube-ready quizzes and presentations</p>
           
-          <div className="relative z-10 mt-12 pt-8 border-t border-white/20 flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-            <span className="text-sm font-medium text-indigo-100">System Ready</span>
+          <div className="flex bg-indigo-700/50 rounded-lg p-1 mt-6">
+            <button
+              type="button"
+              onClick={() => setSetupMode('quiz')}
+              className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${setupMode === 'quiz' ? 'bg-white shadow-sm text-indigo-600' : 'text-indigo-100 hover:text-white'}`}
+            >
+              Quiz Maker
+            </button>
+            <button
+              type="button"
+              onClick={() => setSetupMode('presentation')}
+              className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${setupMode === 'presentation' ? 'bg-white shadow-sm text-indigo-600' : 'text-indigo-100 hover:text-white'}`}
+            >
+              Presentation
+            </button>
           </div>
         </div>
         
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col h-[85vh] overflow-y-auto custom-scrollbar relative bg-white">
-        
-        
-        {setupMode === 'offline' && !pendingInteractiveQuiz && !loadedOfflineQuiz ? (
-          <form className="p-8 space-y-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
-                <FileUp className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-slate-800">Offline Quiz</h2>
-                <p className="text-slate-500 font-medium text-sm">Upload JSON to create custom quizzes</p>
-              </div>
-            </div>
-
-            {error && (
-              <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-4 bg-indigo-50/50 p-6 rounded-2xl border-2 border-indigo-100">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-bold text-indigo-900 uppercase tracking-wider">JSON Files</label>
-                <button type="button" onClick={() => { if (fileInputRef.current) fileInputRef.current.click(); }} className="text-indigo-600 font-bold text-sm bg-white px-4 py-2 rounded-xl hover:bg-indigo-50 border-2 border-indigo-100 shadow-sm transition-all flex items-center gap-2">
-                  <Upload className="w-4 h-4"/> Upload Files
-                </button>
-              </div>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                accept=".json"
-                multiple
-                className="hidden"
-              />
-              
-              {uploadedFileList.length > 0 ? (
-                <div className="space-y-3 mt-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                  {uploadedFileList.map((file, idx) => (
-                    <div key={idx} className="bg-white p-4 rounded-xl border-2 border-emerald-100 flex items-center justify-between shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600"><FileText className="w-5 h-5"/></div>
-                        <div>
-                          <div className="font-bold text-slate-700 text-sm truncate max-w-[200px]">{file.fileName}</div>
-                          <div className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full inline-block mt-1">
-                            {file.questions.length} questions
-                          </div>
-                        </div>
-                      </div>
-                      <button type="button" onClick={() => setUploadedFileList(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-lg transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm font-medium text-slate-500 text-center py-10 bg-white rounded-xl border-2 border-dashed border-indigo-200">
-                  <FileUp className="w-8 h-8 mx-auto mb-3 text-indigo-300" />
-                  No JSON files uploaded yet.<br/>Click "Upload Files" to select custom quiz files.
-                </div>
-              )}
-            </div>
-
-            <div className="pt-6 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => handleStartUploadedFiles('interactive')}
-                disabled={uploadedFileList.length === 0}
-                className="w-full py-4 rounded-xl bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/30 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Sparkles className="w-6 h-6" />
-                Start Offline Quiz
-              </button>
-            </div>
-          </form>
-        ) : setupMode === 'presentation' && !pendingInteractiveQuiz && !loadedOfflineQuiz ? (
+        {setupMode === 'presentation' && !pendingInteractiveQuiz && !loadedOfflineQuiz ? (
           <form className="p-8 space-y-6">
             {error && (
               <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100">
@@ -1316,7 +1219,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             )}
             
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-indigo-500" />
                 Text Content (Max 5000 chars)
               </label>
@@ -1331,7 +1234,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-indigo-500" />
                 Duration (Minutes)
               </label>
@@ -1341,7 +1244,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                 max="60"
                 value={presentationDuration}
                 onChange={(e) => setPresentationDuration(parseInt(e.target.value) || 1)}
-                className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-slate-50/50 text-slate-800 text-lg font-medium cursor-pointer"
+                className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               />
             </div>
 
@@ -1394,7 +1297,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             {renderInsightImagesSummary(loadedOfflineQuiz)}
             
             <div className="space-y-2 text-left mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-              <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-indigo-500" />
                 Rules (Optional)
               </label>
@@ -1457,11 +1360,11 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
 
               {showFrames && (
                 <div className="space-y-2 text-left">
-                  <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Participant Video Frame Size</label>
+                  <label className="text-sm font-semibold text-neutral-700">Participant Video Frame Size</label>
                   <select
                     value={frameSize}
                     onChange={(e) => setFrameSize(e.target.value as 'small' | 'medium' | 'large')}
-                    className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-200 hover:border-indigo-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all bg-indigo-50/30 text-indigo-900 text-lg font-bold cursor-pointer"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-indigo-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/30 bg-white"
                   >
                     <option value="small">Small Frame</option>
                     <option value="medium">Medium Frame (1.25x)</option>
@@ -1471,7 +1374,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
               )}
 
               <div className="space-y-2 text-left">
-                <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Number of Players</label>
+                <label className="text-sm font-semibold text-neutral-700">Number of Players</label>
                 <select
                   value={numPlayers}
                   onChange={(e) => {
@@ -1486,7 +1389,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                     }
                     setPlayers(newPlayers);
                   }}
-                  className="w-full px-5 py-4 rounded-2xl border-2 border-indigo-200 hover:border-indigo-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all bg-indigo-50/30 text-indigo-900 text-lg font-bold cursor-pointer"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-indigo-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/30 bg-white"
                 >
                   <option value={1}>1 Player / Team</option>
                   <option value={2}>2 Players</option>
@@ -1500,7 +1403,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                     <h3 className="font-bold text-slate-700">Player {index + 1}</h3>
                     
                     <div className="space-y-2 text-left">
-                      <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Name</label>
+                      <label className="text-sm font-semibold text-neutral-700">Name</label>
                       <input
                         type="text"
                         value={player.name}
@@ -1516,7 +1419,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                     </div>
 
                     <div className="space-y-2 text-left">
-                      <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Photo (Optional)</label>
+                      <label className="text-sm font-semibold text-neutral-700">Photo (Optional)</label>
                       <input
                         type="file"
                         accept="image/*"
@@ -1541,7 +1444,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                     </div>
 
                     <div className="space-y-2 text-left">
-                      <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Topic to Talk About (Optional)</label>
+                      <label className="text-sm font-semibold text-neutral-700">Topic to Talk About (Optional)</label>
                       <input
                         type="text"
                         value={player.topic}
@@ -1557,7 +1460,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                     </div>
                     
                     <div className="space-y-2 text-left">
-                      <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Details (Optional)</label>
+                      <label className="text-sm font-semibold text-neutral-700">Details (Optional)</label>
                       <textarea
                         value={player.details}
                         onChange={(e) => {
@@ -1611,7 +1514,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             </button>
           </div>
         ) : (
-        <form onSubmit={(e) => handleGenerate(e, 'video')} className="p-8 lg:p-12 space-y-8 max-w-4xl mx-auto w-full">
+        <form onSubmit={(e) => handleGenerate(e, 'video')} className="p-8 space-y-6">
   
           {error && (
             <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100">
@@ -1619,9 +1522,8 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             </div>
           )}
           
-          {needsTopic && (
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+            <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-indigo-500" />
               What is the topic?
             </label>
@@ -1630,14 +1532,13 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="e.g. Dinosaurs, Space, Animals"
-              className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400 bg-slate-50/50 text-slate-800 text-lg font-medium"
-              required={needsTopic}
+              className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder:text-neutral-400"
+              required
             />
           </div>
-  )}
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+            <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-indigo-500" />
               Quiz Type
             </label>
@@ -1647,7 +1548,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                 const val = e.target.value;
                 setQuizType(val);
               }}
-              className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-slate-50/50 text-slate-800 text-lg font-medium cursor-pointer"
+              className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             >
               <option value="multiple-choice">Standard (Multiple Choice)</option>
               <option value="identify-image">Identify the Image</option>
@@ -1665,126 +1566,16 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             </select>
           </div>
 
-
-          {((quizType === 'identify-image' || quizType === 'blurred-image') || quizType === 'multiple-choice' || quizType === 'a-to-z') && (
-            <div className="space-y-4 bg-indigo-50/50 p-6 rounded-2xl border-2 border-indigo-100">
-              <label className="text-sm font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-indigo-500" />
-                Image Source
-              </label>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setIdentifyMode('auto')} className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${identifyMode === 'auto' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-white text-indigo-600 border-2 border-indigo-100 hover:border-indigo-300'}`}>AI Generate</button>
-                <button type="button" onClick={() => setIdentifyMode('custom')} className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${identifyMode === 'custom' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-white text-indigo-600 border-2 border-indigo-100 hover:border-indigo-300'}`}>Upload Images</button>
-                <button type="button" onClick={() => setIdentifyMode('json')} className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all ${identifyMode === 'json' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-white text-indigo-600 border-2 border-indigo-100 hover:border-indigo-300'}`}>Upload JSON</button>
-              </div>
-
-              {identifyMode === 'auto' && (quizType === 'identify-image' || quizType === 'blurred-image') && (
-                <div className="space-y-4 mt-4">
-                  <button type="button" onClick={handleCacheImages} disabled={caching || !topic.trim()} className="w-full py-3 rounded-xl bg-indigo-100 text-indigo-700 font-bold hover:bg-indigo-200 transition-all flex items-center justify-center gap-2">
-                    {caching ? <><Loader2 className="w-5 h-5 animate-spin" /> Generating & Caching Images...</> : <><Sparkles className="w-5 h-5" /> Pre-generate Images</>}
-                  </button>
-                  {cacheSuccess && <div className="text-sm text-emerald-600 font-medium text-center bg-emerald-50 p-2 rounded-lg">{cacheMessage || "Images successfully cached! Ready to play."}</div>}
-                  {error && caching && <div className="text-sm text-red-600 font-medium text-center">{error}</div>}
-                </div>
-              )}
-
-              {identifyMode === 'custom' && (
-                <div className="space-y-4 mt-4">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Upload Images</label>
-                    <button type="button" onClick={() => {
-                       const input = document.createElement('input');
-                       input.type = 'file'; input.multiple = true; input.accept = 'image/*';
-                       input.onchange = async (e) => {
-                         const files = Array.from((e.target as HTMLInputElement).files || []);
-                         for (const file of files) {
-                           const base64 = await new Promise<string>(resolve => { const r = new FileReader(); r.onload = (e) => resolve(e.target?.result as string); r.readAsDataURL(file); });
-                           setCustomImages(prev => [...prev, { id: Math.random().toString(), file, base64, name: file.name.replace(/\.[^/.]+$/, "") }]);
-                         }
-                       };
-                       input.click();
-                    }} className="text-indigo-600 font-bold text-sm bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100">Browse Files</button>
-                  </div>
-                  {customImages.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                      {customImages.map((img, idx) => (
-                         <div key={img.id} className="bg-white p-2 rounded-xl border-2 border-slate-100 flex flex-col gap-2">
-                           <div className="relative aspect-video bg-slate-100 rounded-lg overflow-hidden">
-                             <img src={img.base64} alt="preview" className="w-full h-full object-cover" />
-                             <button type="button" onClick={() => setCustomImages(prev => prev.filter(c => c.id !== img.id))} className="absolute top-1 right-1 bg-white/80 p-1 rounded-md text-red-500 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
-                           </div>
-                           <input type="text" value={img.name} onChange={e => {
-                             const n = [...customImages];
-                             n[idx].name = e.target.value;
-                             setCustomImages(n);
-                           }} className="w-full px-2 py-1 text-sm border-2 border-slate-100 rounded-md focus:border-indigo-400 focus:outline-none" placeholder="Enter answer..." />
-                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-slate-500 text-center py-6 bg-white rounded-xl border-2 border-dashed border-slate-200">No images uploaded yet.</div>
-                  )}
-                </div>
-              )}
-
-              {identifyMode === 'json' && (
-                <div className="space-y-4 mt-4">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">JSON File</label>
-                    <div className="flex gap-2">
-                       <button type="button" onClick={downloadJsonTemplate} className="text-emerald-600 font-bold text-sm bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 flex items-center gap-1"><Download className="w-4 h-4"/> Template</button>
-                       <button type="button" onClick={() => {
-                          const input = document.createElement('input');
-                          input.type = 'file'; input.accept = '.json';
-                          input.onchange = async (e) => {
-                            const file = (e.target as HTMLInputElement).files?.[0];
-                            if (!file) return;
-                            const text = await file.text();
-                            try {
-                              const json = JSON.parse(text);
-                              const items = Array.isArray(json) ? json : (json.items || json.questions || []);
-                              setJsonItems(items);
-                              setJsonFileNames([file.name]);
-                            } catch(err) {
-                              setError("Invalid JSON format");
-                            }
-                          };
-                          input.click();
-                       }} className="text-indigo-600 font-bold text-sm bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 flex items-center gap-1"><Upload className="w-4 h-4"/> Upload</button>
-                    </div>
-                  </div>
-                  {jsonFileNames.length > 0 ? (
-                    <div className="bg-white p-4 rounded-xl border-2 border-emerald-100 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600"><FileText className="w-5 h-5"/></div>
-                        <div>
-                          <div className="font-bold text-slate-700 text-sm">{jsonFileNames[0]}</div>
-                          <div className="text-xs text-slate-500">{jsonItems.length} items loaded</div>
-                        </div>
-                      </div>
-                      <button type="button" onClick={handleCacheImages} disabled={caching || cacheSuccess} className="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-emerald-100">
-                        {cacheSuccess ? "Images Cached" : caching ? "Caching..." : "Cache Images"}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-slate-500 text-center py-6 bg-white rounded-xl border-2 border-dashed border-slate-200">No JSON file loaded yet.</div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
                 <Mic className="w-4 h-4 text-indigo-500" />
                 Voice
               </label>
               <select
                 value={voicePreference}
                 onChange={(e) => setVoicePreference(e.target.value as any)}
-                className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-slate-50/50 text-slate-800 text-lg font-medium cursor-pointer"
+                className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
                 <option value="female">Female</option>
                 <option value="male">Male</option>
@@ -1793,14 +1584,14 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
                 <Music className="w-4 h-4 text-indigo-500" />
                 Music & SFX
               </label>
               <select
                 value={musicEnabled ? 'yes' : 'no'}
                 onChange={(e) => setMusicEnabled(e.target.value === 'yes')}
-                className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-slate-50/50 text-slate-800 text-lg font-medium cursor-pointer"
+                className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
                 <option value="yes">Enabled</option>
                 <option value="no">Disabled</option>
@@ -1810,14 +1601,14 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
           
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
                 <Settings className="w-4 h-4 text-indigo-500" />
                 Difficulty
               </label>
               <select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value)}
-                className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-slate-50/50 text-slate-800 text-lg font-medium cursor-pointer"
+                className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
                 <option value="easy">Easy (Ages 4-7)</option>
                 <option value="medium">Medium (Ages 8-11)</option>
@@ -1827,7 +1618,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <label className="text-sm font-semibold text-neutral-700 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-indigo-500" />
                 Questions
               </label>
@@ -1959,47 +1750,8 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                />
              </div>
           )}
-
-          <div className="flex flex-col sm:flex-row gap-4 mt-12 pt-6 border-t-2 border-slate-100">
-            <button
-              type="submit"
-              disabled={loading || !topic.trim()}
-              className="flex-1 py-5 rounded-2xl bg-indigo-600 text-white font-black text-xl hover:bg-indigo-700 hover:scale-[1.02] hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-indigo-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(79,70,229,0.3)] active:scale-95"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  Generating AI Quiz...
-                </>
-              ) : (
-                <>
-                  <Play className="w-7 h-7 fill-current" />
-                  Start Video Quiz
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={(e) => handleGenerate(e as any, 'interactive')}
-              disabled={loading || !topic.trim()}
-              className="flex-1 py-5 rounded-2xl bg-fuchsia-600 text-white font-black text-xl hover:bg-fuchsia-700 hover:scale-[1.02] hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-fuchsia-500/30 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:translate-y-0 flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(192,38,211,0.3)] active:scale-95"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  Generating AI Quiz...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-7 h-7 fill-current" />
-                  Interactive Mode
-                </>
-              )}
-            </button>
-          </div>
         </form>
         )}
-      </div>
       </motion.div>
       
       {/* Hidden container to preload cached images */}

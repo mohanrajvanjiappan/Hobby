@@ -1,6 +1,6 @@
 {
   "name": "Kids Video Quiz Generator",
   "description": "Generate dynamic, vibrant, YouTube-ready quizzes with AI voice and timers.",
-  "requestFramePermissions": ["camera"],
+  "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
