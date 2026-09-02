@@ -200,16 +200,25 @@ const ParticipantVideoFrames: React.FC<ParticipantVideoFramesProps> = ({
             </div>
 
             {quiz.showBadges !== false && player.badges && player.badges.length > 0 && (
-              <div className="flex items-center justify-between gap-1 px-2.5 py-1 bg-amber-400/20 backdrop-blur-md rounded-xl border border-amber-300/40 text-xs w-full overflow-hidden shadow-sm">
-                <span className="text-[10px] font-extrabold text-amber-200 uppercase tracking-wider shrink-0">
+              <div className="flex items-center justify-between gap-1 px-2.5 py-1.5 bg-gradient-to-r from-amber-400/30 via-pink-500/20 to-fuchsia-500/30 backdrop-blur-xl rounded-xl border border-white/20 text-xs w-full overflow-hidden shadow-[0_0_15px_rgba(251,191,36,0.3)]">
+                <span className="text-[10px] font-extrabold text-white uppercase tracking-wider shrink-0 drop-shadow-md">
                   Badges
                 </span>
-                <div className="flex items-center gap-1 overflow-hidden">
+                <div className="flex items-center gap-1.5 overflow-hidden">
                   {player.badges.slice(-5).map((b: string, bIdx: number) => (
-                    <span key={bIdx} className="text-xs drop-shadow animate-bounce">{b}</span>
+                    <motion.span 
+                       key={bIdx} 
+                       initial={{ scale: 0, rotate: -45 }} 
+                       animate={{ scale: 1, rotate: 0 }} 
+                       className="text-sm filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] transform-gpu hover:scale-125 transition-transform cursor-pointer"
+                    >
+                       {b}
+                    </motion.span>
                   ))}
                   {player.badges.length > 5 && (
-                    <span className="text-[10px] font-black text-amber-300">+{player.badges.length - 5}</span>
+                    <span className="text-[10px] font-black text-white bg-black/40 px-1.5 py-0.5 rounded-full backdrop-blur-md border border-white/10 shadow-inner">
+                      +{player.badges.length - 5}
+                    </span>
                   )}
                 </div>
               </div>
@@ -3211,24 +3220,30 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               const earnedCount = Math.min(maxBadges, Math.floor(numAnswered / badgeInterval));
 
               return (
-                <div className="w-full mb-6 mt-2">
-                  <div className="flex justify-between text-white/90 font-bold mb-2 text-sm uppercase tracking-wider">
-                    <span>Milestone Progress</span>
-                    <span>{earnedCount} of {maxBadges} Badges</span>
+                <div className="w-full mb-6 mt-2 relative">
+                  <div className="flex justify-between text-white/90 font-bold mb-2 text-xs md:text-sm uppercase tracking-wider drop-shadow-sm">
+                    <span className="flex items-center gap-2"><Star className="w-4 h-4 text-amber-300" /> Milestone Progress</span>
+                    <span className="bg-white/20 px-3 py-1 rounded-full backdrop-blur-md">{earnedCount} / {maxBadges} Badges</span>
                   </div>
-                  <div className="w-full h-3 bg-white/20 rounded-full overflow-hidden relative shadow-inner">
+                  <div className="w-full h-4 bg-slate-900/40 rounded-full overflow-hidden relative shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] border border-white/10 backdrop-blur-sm">
                     <motion.div 
-                      className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-300 to-yellow-500"
+                      className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-400 via-pink-500 to-fuchsia-500 shadow-[0_0_10px_rgba(217,70,239,0.8)]"
                       initial={{ width: `${(Math.max(0, numAnswered) / totalQ) * 100}%` }}
                       animate={{ width: `${((numAnswered + (stage === 'reveal' && (!isInteractiveGrid || !answeredQuestions.has(currentQuestionIndex)) ? 1 : 0)) / totalQ) * 100}%` }}
                       transition={{ duration: 0.8, ease: "easeOut" }}
-                    />
+                    >
+                      <motion.div 
+                         className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-20deg]"
+                         animate={{ x: ['-200%', '200%'] }}
+                         transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                      />
+                    </motion.div>
                     {/* Milestone markers */}
                     {Array.from({ length: maxBadges }).map((_, i) => (
                       <div 
                         key={i} 
-                        className="absolute top-0 w-1 h-full bg-white/40 shadow-sm" 
-                        style={{ left: `${Math.min(100, ((i + 1) * badgeInterval / totalQ) * 100)}%` }} 
+                        className="absolute top-0 w-1.5 h-full bg-white shadow-[0_0_5px_white] z-10" 
+                        style={{ left: `${Math.min(100, ((i + 1) * badgeInterval / totalQ) * 100)}%`, marginLeft: '-3px' }} 
                       />
                     ))}
                   </div>
@@ -4658,35 +4673,68 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           return (
           <motion.div
             key="video-badges"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="text-center p-12 max-w-7xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-slate-950/80 backdrop-blur-xl overflow-hidden"
           >
-             <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-2xl mb-12">
+            {/* Celebratory radial burst background */}
+            <motion.div 
+               animate={{ rotate: 360 }} 
+               transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+               className="absolute w-[150vw] h-[150vw] max-w-[1200px] max-h-[1200px] rounded-full opacity-20 pointer-events-none"
+               style={{
+                 background: "conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.8) 30deg, transparent 60deg, rgba(255,255,255,0.8) 90deg, transparent 120deg, rgba(255,255,255,0.8) 150deg, transparent 180deg, rgba(255,255,255,0.8) 210deg, transparent 240deg, rgba(255,255,255,0.8) 270deg, transparent 300deg, rgba(255,255,255,0.8) 330deg, transparent 360deg)"
+               }}
+            />
+
+             <motion.h1 
+               initial={{ y: -50, opacity: 0, scale: 0.8 }}
+               animate={{ y: 0, opacity: 1, scale: 1 }}
+               transition={{ type: "spring", bounce: 0.5 }}
+               className="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-500 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] mb-12 z-10 text-center px-4"
+             >
                {quiz.mode === 'interactive' ? `${currentBadge.player}'s Milestone!` : 'Audience Milestone!'}
-             </h1>
+             </motion.h1>
+
              <motion.div
-                initial={{ scale: 0.8, opacity: 0, y: 50, rotateX: -15 }}
-                animate={{ scale: 1, opacity: 1, y: 0, rotateX: 0 }}
-                transition={{ type: 'spring', bounce: 0.5, duration: 1 }}
-                className={`relative overflow-hidden bg-white/95 backdrop-blur-xl rounded-[3rem] p-12 flex flex-col items-center text-center shadow-[0_40px_100px_rgba(0,0,0,0.5)] border-4 ${currentBadge.color} w-full max-w-lg`}
+                initial={{ scale: 0.5, opacity: 0, y: 100 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                transition={{ type: 'spring', bounce: 0.6, duration: 1 }}
+                className="relative group z-10 w-full max-w-lg px-4"
               >
-                <motion.div 
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent skew-x-[-20deg]"
-                  animate={{ x: ['-200%', '200%'] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1 }}
-                />
-                <motion.div 
-                  animate={{ y: [0, -15, 0], rotate: [-3, 3, -3] }}
-                  className="text-8xl md:text-[10rem] mb-10 filter drop-shadow-[0_20px_20px_rgba(0,0,0,0.2)] relative z-10"
-                >
-                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-amber-400/20 blur-3xl rounded-full mix-blend-multiply" />
-                   <span className="relative block">{currentBadge.icon}</span>
-                </motion.div>
-                <h3 className={`text-4xl md:text-5xl font-black ${currentBadge.text} mb-4 relative z-10 tracking-tight leading-tight`}>{currentBadge.title}</h3>
-                <p className="text-xl md:text-2xl text-slate-500 font-bold relative z-10 leading-snug">{currentBadge.description}</p>
-                <div className="mt-8 py-3 px-8 bg-slate-900 rounded-full font-bold text-amber-300 tracking-wider text-sm uppercase shadow-lg border border-slate-700 relative z-10">
-                  {numAnswered} Questions Completed in {currentBadge.contextTopic}!
+                {/* Outer glowing border ring */}
+                <div className="absolute inset-0 rounded-[3rem] bg-gradient-to-tr from-yellow-400 via-fuchsia-500 to-cyan-400 opacity-70 blur-xl group-hover:opacity-100 transition duration-500 animate-pulse" />
+                
+                <div className="relative flex flex-col items-center bg-slate-900/90 backdrop-blur-2xl rounded-[3rem] p-10 md:p-14 shadow-2xl border border-white/20 overflow-hidden w-full">
+                  {/* Animated holographic sweep */}
+                  <motion.div 
+                    className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent skew-x-[-30deg]"
+                    animate={{ x: ['-200%', '200%'] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                  
+                  <motion.div 
+                    animate={{ y: [0, -20, 0], scale: [1, 1.05, 1], rotate: [-2, 2, -2] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                    className="relative flex items-center justify-center w-48 h-48 md:w-64 md:h-64 mb-8"
+                  >
+                     {/* Behind the icon glow */}
+                     <div className="absolute w-full h-full bg-gradient-to-br from-yellow-300/30 to-fuchsia-500/30 rounded-full blur-2xl animate-spin-slow" />
+                     <span className="text-[7rem] md:text-[9rem] relative z-10 filter drop-shadow-[0_20px_30px_rgba(0,0,0,0.6)] transform-gpu">{currentBadge.icon}</span>
+                  </motion.div>
+                  
+                  <div className="text-center relative z-10 space-y-4">
+                    <h3 className="text-4xl md:text-5xl font-black text-white tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-slate-300 drop-shadow-md">
+                      {currentBadge.title}
+                    </h3>
+                    <p className="text-xl md:text-2xl text-slate-300 font-bold leading-relaxed">
+                      {currentBadge.description}
+                    </p>
+                  </div>
+
+                  <div className="mt-8 py-4 px-10 bg-gradient-to-r from-fuchsia-600 to-purple-600 rounded-full font-black text-white tracking-widest text-sm md:text-base uppercase shadow-[0_0_30px_rgba(192,38,211,0.5)] border border-fuchsia-400 relative z-10">
+                    {numAnswered} Questions Completed!
+                  </div>
                 </div>
               </motion.div>
           </motion.div>
@@ -4696,56 +4744,88 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         {stage === 'badges' && (
           <motion.div
             key="badges"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="text-center p-12 max-w-7xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 flex flex-col items-center justify-center z-50 bg-slate-950/90 backdrop-blur-xl overflow-hidden py-12"
           >
-             <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-2xl mb-12">
+             {/* Sparkles background */}
+             <div className="absolute inset-0 overflow-hidden pointer-events-none">
+               {[...Array(20)].map((_, i) => (
+                 <motion.div
+                   key={i}
+                   className="absolute w-2 h-2 bg-white rounded-full blur-[1px]"
+                   style={{
+                     top: `${Math.random() * 100}%`,
+                     left: `${Math.random() * 100}%`,
+                   }}
+                   animate={{
+                     scale: [0, 1, 0],
+                     opacity: [0, 0.8, 0],
+                   }}
+                   transition={{
+                     duration: 2 + Math.random() * 2,
+                     repeat: Infinity,
+                     delay: Math.random() * 2,
+                   }}
+                 />
+               ))}
+             </div>
+
+             <motion.h1 
+               initial={{ y: -50, opacity: 0 }}
+               animate={{ y: 0, opacity: 1 }}
+               className="text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-yellow-500 drop-shadow-[0_0_20px_rgba(251,191,36,0.4)] mb-12 z-10"
+             >
                Earned Badges!
-             </h1>
+             </motion.h1>
              
-             <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 w-full max-w-7xl relative z-10 px-4">
+             <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 w-full max-w-7xl relative z-10 px-4 max-h-[60vh] overflow-y-auto pb-8 custom-scrollbar">
                {earnedBadges.map((badge, idx) => {
                   return (
                   <motion.div
                     key={idx}
-                    initial={{ scale: 0.8, opacity: 0, y: 50, rotateX: 20 }}
-                    animate={{ scale: 1, opacity: 1, y: 0, rotateX: 0 }}
+                    initial={{ scale: 0.5, opacity: 0, y: 50 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
                     whileHover={{ scale: 1.05, y: -10 }}
-                    transition={{ delay: idx * 0.2, type: 'spring', bounce: 0.5, duration: 1 }}
-                    className="relative group bg-white/95 backdrop-blur-xl rounded-[3rem] p-8 md:p-10 flex flex-col items-center text-center shadow-[0_20px_60px_rgba(0,0,0,0.2)] border-[6px] border-white/50 w-72 md:w-80 overflow-hidden"
+                    transition={{ delay: idx * 0.15, type: 'spring', bounce: 0.5, duration: 0.8 }}
+                    className="relative group w-72 md:w-80"
                   >
-                    {/* Animated Shine Effect */}
-                    <motion.div 
-                      className="absolute inset-0 -translate-x-[150%] skew-x-[-30deg] bg-gradient-to-r from-transparent via-white/70 to-transparent z-0 group-hover:translate-x-[150%]"
-                      transition={{ duration: 0.8, ease: "easeInOut" }}
-                    />
+                    {/* Glowing Aura */}
+                    <div className="absolute inset-0 rounded-[2.5rem] bg-gradient-to-tr from-yellow-400/50 via-pink-500/50 to-cyan-400/50 blur-lg group-hover:blur-xl transition duration-500" />
                     
-                    <motion.div 
-                      animate={{ y: [0, -12, 0], rotate: [-2, 2, -2] }}
-                      transition={{ duration: 3 + Math.random(), repeat: Infinity, ease: "easeInOut" }}
-                      className="text-8xl md:text-9xl mb-8 filter drop-shadow-[0_15px_15px_rgba(0,0,0,0.2)] z-10 relative"
-                    >
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-amber-400/20 blur-3xl rounded-full mix-blend-multiply" />
-                      <span className="relative block transform transition-transform group-hover:scale-110 duration-500">{badge.icon}</span>
-                    </motion.div>
+                    <div className="relative bg-slate-900/80 backdrop-blur-2xl rounded-[2.5rem] p-8 md:p-10 flex flex-col items-center text-center shadow-[0_20px_60px_rgba(0,0,0,0.5)] border border-white/20 overflow-hidden h-full">
+                      {/* Animated Shine Effect */}
+                      <motion.div 
+                        className="absolute inset-0 -translate-x-[150%] skew-x-[-30deg] bg-gradient-to-r from-transparent via-white/20 to-transparent z-0 group-hover:translate-x-[150%]"
+                        transition={{ duration: 0.8, ease: "easeInOut" }}
+                      />
+                      
+                      <motion.div 
+                        animate={{ y: [0, -10, 0], rotate: [-3, 3, -3] }}
+                        transition={{ duration: 3 + Math.random(), repeat: Infinity, ease: "easeInOut" }}
+                        className="text-[6rem] md:text-[8rem] mb-6 filter drop-shadow-[0_15px_15px_rgba(0,0,0,0.4)] z-10 relative"
+                      >
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-yellow-400/20 blur-2xl rounded-full mix-blend-screen" />
+                        <span className="relative block transform transition-transform group-hover:scale-110 duration-500">{badge.icon}</span>
+                      </motion.div>
 
-                    <div className="z-10 bg-slate-900 text-amber-300 font-bold uppercase tracking-[0.15em] text-xs px-5 py-2 rounded-full mb-5 shadow-md border border-slate-700/50">
-                      {badge.player}
+                      <div className="z-10 bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white font-black uppercase tracking-[0.15em] text-xs px-5 py-2 rounded-full mb-5 shadow-[0_0_15px_rgba(192,38,211,0.4)] border border-fuchsia-400">
+                        {badge.player}
+                      </div>
+
+                      <h3 className="z-10 text-2xl md:text-3xl font-black text-white mb-3 tracking-tight leading-tight">{badge.name}</h3>
+                      
+                      <p className="z-10 text-sm md:text-base text-slate-300 font-semibold px-2 leading-relaxed">{badge.description}</p>
                     </div>
-
-                    <h3 className="z-10 text-3xl font-black text-slate-800 mb-4 tracking-tight leading-tight">{badge.name}</h3>
-                    
-                    <p className="z-10 text-sm md:text-base text-slate-500 font-semibold px-2 leading-relaxed">{badge.description}</p>
                   </motion.div>
                )})}
              </div>
              
-             <div className="mt-16 flex flex-wrap justify-center gap-6">
+             <div className="mt-12 flex flex-wrap justify-center gap-6 relative z-20">
                <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: earnedBadges.length * 0.4 + 1 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: earnedBadges.length * 0.15 + 0.5 }}
                   onClick={() => {
                     if (quiz.participantTopic && quiz.participantTopic.trim()) {
                       setStage('talk');
@@ -4755,7 +4835,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       setStage('celebrate');
                     }
                   }}
-                  className="px-10 py-5 bg-yellow-400 text-yellow-900 rounded-full font-black text-2xl shadow-[0_10px_0_rgba(202,138,4,1)] hover:translate-y-2 hover:shadow-none transition-all"
+                  className="px-12 py-5 bg-gradient-to-r from-yellow-400 to-amber-500 text-yellow-950 rounded-full font-black text-2xl shadow-[0_10px_0_rgba(180,83,9,1),0_10px_30px_rgba(251,191,36,0.5)] hover:translate-y-2 hover:shadow-[0_0px_0_rgba(180,83,9,1),0_5px_15px_rgba(251,191,36,0.5)] transition-all uppercase tracking-wider"
                 >
                   Continue
                </motion.button>
