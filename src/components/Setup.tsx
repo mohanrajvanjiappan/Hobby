@@ -174,7 +174,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
   const [enableClapping, setEnableClapping] = useState<boolean>(true);
   const [enableMemoryBreak, setEnableMemoryBreak] = useState<boolean>(true);
   const [themeMemoryBreak, setThemeMemoryBreak] = useState<boolean>(false);
-  const [memoryBreakImageCount, setMemoryBreakImageCount] = useState<number>(10);
+  const [memoryBreakImageCount, setMemoryBreakImageCount] = useState<number>(8);
   const [enableDynamicColors, setEnableDynamicColors] = useState<boolean>(false);
   const [enableInsightImages, setEnableInsightImages] = useState<boolean>(true);
   const [setupMode, setSetupMode] = useState<'quiz' | 'presentation' | 'offline'>('quiz');
@@ -246,7 +246,8 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
     "id": 1,
     "brand_name": "Tesla",
     "image_file_name": "tesla-logo.png",
-    "image_url": "https://www.carlogos.org/car-logos/tesla-logo.png"
+    "image_url": "https://www.carlogos.org/car-logos/tesla-logo.png",
+    "difficulty": "Easy"
   },
   {
     "id": 2,
@@ -599,12 +600,14 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
         {
           question: "What is the capital of France?",
           options: ["London", "Paris", "Berlin", "Rome"],
-          correctAnswer: "Paris"
+          correctAnswer: "Paris",
+          difficulty: "Easy"
         },
         {
           question: "Which planet is known as the Red Planet?",
           options: ["Earth", "Mars", "Jupiter", "Saturn"],
-          correctAnswer: "Mars"
+          correctAnswer: "Mars",
+          difficulty: "Medium"
         }
       ];
     } else if (quizType === 'a-to-z') {
@@ -799,6 +802,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
         {
           type: "multiple-choice",
           category: "General Knowledge",
+          difficulty: "Easy",
           question: "What is 2 + 2?",
           options: ["3", "4", "5", "6"],
           correctAnswer: "4",
@@ -807,6 +811,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
         {
           type: "identify-image",
           category: "Brands",
+          difficulty: "Medium",
           question: "Identify this brand",
           imageUrl: "",
           options: ["Tesla", "Toyota", "Ford", "Honda"],
@@ -816,6 +821,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
         {
           type: "jumbled-letters",
           category: "Vocabulary",
+          difficulty: "Hard",
           question: "Unjumble the word",
           word: "REACT",
           correctAnswer: "REACT",
@@ -828,6 +834,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
           question: "What is 2 + 2?",
           options: ["3", "4", "5", "6"],
           correctAnswer: "4",
+          difficulty: "Easy",
           insight: "Simple addition.",
           timeLimit: 10
         }
@@ -1401,7 +1408,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                 Text Content (Max 5000 chars)
               </label>
               <textarea
-                value={presentationContent}
+                value={presentationContent || ""}
                 onChange={(e) => setPresentationContent(e.target.value.substring(0, 5000))}
                 placeholder="Paste your text content here to generate a presentation..."
                 className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all placeholder:text-neutral-400 h-40 resize-none"
@@ -1479,7 +1486,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                 Rules (Optional)
               </label>
               <textarea
-                value={rules}
+                value={rules || ""}
                 onChange={(e) => setRules(e.target.value)}
                 placeholder="Enter the rules of the quiz here. Each line will be a bullet point."
                 className="w-full px-4 py-3 rounded-xl border border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 bg-white min-h-[120px]"
@@ -1583,7 +1590,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                       <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Name</label>
                       <input
                         type="text"
-                        value={player.name}
+                        value={player.name || ""}
                         onChange={(e) => {
                           const newPlayers = [...players];
                           newPlayers[index].name = e.target.value;
@@ -1624,7 +1631,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                       <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Topic to Talk About (Optional)</label>
                       <input
                         type="text"
-                        value={player.topic}
+                        value={player.topic || ""}
                         onChange={(e) => {
                           const newPlayers = [...players];
                           newPlayers[index].topic = e.target.value;
@@ -1639,7 +1646,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                     <div className="space-y-2 text-left">
                       <label className="text-sm font-bold text-slate-700 uppercase tracking-wider">Details (Optional)</label>
                       <textarea
-                        value={player.details}
+                        value={player.details || ""}
                         onChange={(e) => {
                           const newPlayers = [...players];
                           newPlayers[index].details = e.target.value;
@@ -1707,7 +1714,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             </label>
             <input
               type="text"
-              value={topic}
+              value={topic || ""}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="e.g. Dinosaurs, Space, Animals"
               className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 hover:border-indigo-200 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400 bg-slate-50/50 text-slate-800 text-lg font-medium"
@@ -1793,7 +1800,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
                              <img src={img.base64} alt="preview" className="w-full h-full object-cover" />
                              <button type="button" onClick={() => setCustomImages(prev => prev.filter(c => c.id !== img.id))} className="absolute top-1 right-1 bg-white/80 p-1 rounded-md text-red-500 hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
                            </div>
-                           <input type="text" value={img.name} onChange={e => {
+                           <input type="text" value={img.name || ""} onChange={e => {
                              const n = [...customImages];
                              n[idx].name = e.target.value;
                              setCustomImages(n);

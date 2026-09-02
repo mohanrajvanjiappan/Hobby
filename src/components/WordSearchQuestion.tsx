@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { WordSearchData, WordSearchWord } from '../types';
 
@@ -20,17 +20,18 @@ const DIRECTION_DELTAS: Record<string, { dr: number; dc: number }> = {
 
 /** Bright, distinguishable highlight colours for each hidden word */
 const WORD_COLOURS = [
-  { bg: 'bg-rose-400',   text: 'text-white',  pill: 'bg-rose-400',   border: 'border-rose-600'   },
-  { bg: 'bg-sky-400',    text: 'text-white',  pill: 'bg-sky-400',    border: 'border-sky-600'    },
-  { bg: 'bg-amber-400',  text: 'text-slate-900', pill: 'bg-amber-400',  border: 'border-amber-600'  },
-  { bg: 'bg-emerald-400',text: 'text-white',  pill: 'bg-emerald-400',border: 'border-emerald-600'},
-  { bg: 'bg-purple-400', text: 'text-white',  pill: 'bg-purple-400', border: 'border-purple-600' },
+  { bg: 'bg-rose-500',   text: 'text-white',  pill: 'bg-rose-500',   border: 'border-rose-400'   },
+  { bg: 'bg-sky-500',    text: 'text-white',  pill: 'bg-sky-500',    border: 'border-sky-400'    },
+  { bg: 'bg-amber-400',  text: 'text-slate-900', pill: 'bg-amber-400',  border: 'border-amber-300'  },
+  { bg: 'bg-emerald-500',text: 'text-white',  pill: 'bg-emerald-500',border: 'border-emerald-400'},
+  { bg: 'bg-purple-500', text: 'text-white',  pill: 'bg-purple-500', border: 'border-purple-400' },
 ];
 
 function getCellsForWord(w: WordSearchWord): Set<string> {
   const cells = new Set<string>();
   const delta = DIRECTION_DELTAS[w.direction];
   if (!delta) return cells;
+
   for (let i = 0; i < w.word.length; i++) {
     cells.add(`${w.row + delta.dr * i},${w.col + delta.dc * i}`);
   }
@@ -40,25 +41,44 @@ function getCellsForWord(w: WordSearchWord): Set<string> {
 export default function WordSearchQuestion({ wordSearch, isReveal }: WordSearchQuestionProps) {
   const { grid, words } = wordSearch;
 
+  const [revealedWordsCount, setRevealedWordsCount] = useState(0);
+
+  useEffect(() => {
+    if (!isReveal) {
+      setRevealedWordsCount(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setRevealedWordsCount((prev) => {
+        if (prev < words.length) {
+          return prev + 1;
+        }
+        clearInterval(interval);
+        return prev;
+      });
+    }, 1200);
+    return () => clearInterval(interval);
+  }, [isReveal, words.length]);
+
   /** Map each cell key → word index (first word wins if overlap) */
   const cellColourMap = useMemo<Map<string, number>>(() => {
     const map = new Map<string, number>();
     if (!isReveal) return map;
-    words.forEach((w, wIdx) => {
+    
+    words.slice(0, revealedWordsCount).forEach((w, wIdx) => {
       const cells = getCellsForWord(w);
       cells.forEach(key => {
         if (!map.has(key)) map.set(key, wIdx);
       });
     });
     return map;
-  }, [isReveal, words]);
+  }, [isReveal, words, revealedWordsCount]);
 
   return (
-    <div className="flex flex-col items-center gap-6 w-full">
-
+    <div className="flex flex-col items-center gap-8 w-full max-w-4xl mx-auto">
       {/* Grid */}
       <div
-        className="grid gap-1"
+        className="grid gap-2 p-4 sm:p-6 bg-white/10 backdrop-blur-md rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.2)] border border-white/20"
         style={{ gridTemplateColumns: `repeat(${grid[0]?.length ?? 8}, 1fr)` }}
       >
         {grid.map((row, r) =>
@@ -71,16 +91,16 @@ export default function WordSearchQuestion({ wordSearch, isReveal }: WordSearchQ
             return (
               <motion.div
                 key={key}
-                animate={isHighlighted ? { scale: [1, 1.15, 1] } : {}}
-                transition={{ duration: 0.4, delay: (r * 8 + c) * 0.01 }}
+                animate={isHighlighted ? { scale: [1, 1.2, 1], rotate: [0, -5, 5, 0] } : {}}
+                transition={{ duration: 0.5, type: 'spring' }}
                 className={[
-                  'w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16',
+                  'w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 lg:w-24 lg:h-24',
                   'flex items-center justify-center',
-                  'rounded-lg font-black text-xl sm:text-2xl md:text-3xl lg:text-4xl',
-                  'border-2 transition-all duration-300',
+                  'rounded-2xl font-black text-2xl sm:text-3xl md:text-5xl lg:text-6xl uppercase',
+                  'transition-all duration-300 transform',
                   isHighlighted && colour
-                    ? `${colour.bg} ${colour.text} ${colour.border} shadow-lg`
-                    : 'bg-slate-100 text-slate-800 border-slate-300 shadow-sm',
+                    ? `${colour.bg} ${colour.text} ${colour.border} shadow-[0_0_20px_rgba(0,0,0,0.4)] ring-4 ring-white/60 z-10 scale-105`
+                    : 'bg-white/90 text-slate-800 shadow-md hover:bg-white',
                 ].join(' ')}
               >
                 {letter}
@@ -91,23 +111,24 @@ export default function WordSearchQuestion({ wordSearch, isReveal }: WordSearchQ
       </div>
 
       {/* Word list */}
-      <div className="flex flex-wrap gap-3 justify-center">
+      <div className="flex flex-wrap gap-4 justify-center mt-4">
         {words.map((w, idx) => {
           const colour = WORD_COLOURS[idx % WORD_COLOURS.length];
+          const isWordRevealed = isReveal && idx < revealedWordsCount;
           return (
-            <motion.div
+             <motion.div
               key={w.word}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0, scale: isWordRevealed ? 1.1 : 1 }}
+              transition={{ delay: idx * 0.1, type: 'spring' }}
               className={[
-                'px-5 py-2 rounded-full font-black text-xl md:text-2xl border-b-4 shadow-md',
-                isReveal
-                  ? `${colour.pill} ${colour.text} ${colour.border}`
-                  : 'bg-white/20 text-white border-white/20 backdrop-blur-sm',
+                'px-6 py-3 rounded-2xl font-black text-2xl md:text-3xl border shadow-xl transition-all duration-500',
+                isWordRevealed
+                  ? `${colour.bg} ${colour.text} ${colour.border} ring-4 ring-white/40 scale-110`
+                  : 'bg-white/10 text-white/80 border-white/20 backdrop-blur-md',
               ].join(' ')}
             >
-              {isReveal ? w.word : `Word ${idx + 1}`}
+              {isWordRevealed ? w.word : `WORD ${idx + 1}`}
             </motion.div>
           );
         })}

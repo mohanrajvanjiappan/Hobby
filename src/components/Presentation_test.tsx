@@ -673,7 +673,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               } else if (quiz.type === 'combat-mode') {
                 introSpeech = `Welcome back to Combat Mode! Today's topic is ${getActiveContextTopic(0)}. Pair up with a friend. Look at your side of the screen and answer before the time runs out!`;
               } else if (currentType === 'word-search') {
-                introSpeech = `Welcome back to Word Search! Today's topic is ${getActiveContextTopic(0)}. Find the 5 hidden words in the grid. You have 30 seconds. Look left-to-right, and top-to-bottom only!`;
+                introSpeech = `Welcome back to Word Search! Today's topic is ${getActiveContextTopic(0)}. Find the 3 hidden words in the grid. You have 30 seconds. Look left-to-right, and top-to-bottom only!`;
               }
             }
           }
@@ -1256,7 +1256,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) {
                  setHasPlayedMemoryBreak(true);
                  const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈'];
-                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, 10);
+                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 8);
                  setMemoryItems(shuffled);
                  setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]);
                  setStage('memory-break-intro');
@@ -1363,7 +1363,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) { 
                  setHasPlayedMemoryBreak(true); 
                  const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈']; 
-                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, 10); 
+                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 8); 
                  setMemoryItems(shuffled); 
                  setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]); 
                  setStage('memory-break-intro');
@@ -1651,7 +1651,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) {
                    setHasPlayedMemoryBreak(true);
                    const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈'];
-                   const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, 10);
+                   const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 8);
                    setMemoryItems(shuffled);
                    setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]);
                    setStage('memory-break-intro');
@@ -3075,10 +3075,17 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             
             {/* Top Bar */}
             <div className={`w-full flex ${quiz.mode === 'interactive' ? 'justify-start gap-4 md:gap-6 flex-wrap' : 'justify-between'} items-center ${currentType === '5-clues' || currentType === 'detective' || currentType === 'find-in-map' ? 'mb-4 md:mb-6' : 'mb-10'}`}>
-              <div className="bg-white px-8 py-3 rounded-full shadow-2xl border-4 border-slate-100">
-                <span className="text-2xl font-black text-rose-500 tracking-wider uppercase">
-                  Question {currentQuestionIndex + 1} of {quiz.questions.length}
-                </span>
+              <div className="flex gap-4 items-center">
+                <div className="bg-white px-8 py-3 rounded-full shadow-2xl border-4 border-slate-100">
+                  <span className="text-2xl font-black text-rose-500 tracking-wider uppercase">
+                    Question {currentQuestionIndex + 1} of {quiz.questions.length}
+                  </span>
+                </div>
+                {question.difficulty && (
+                  <div className="bg-amber-100 text-amber-700 px-6 py-3 rounded-full shadow-2xl font-black text-xl tracking-widest uppercase border-4 border-amber-300">
+                    {question.difficulty}
+                  </div>
+                )}
               </div>
               
               {quiz.isMultiplayer && quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (
@@ -3540,7 +3547,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   >
                     <input
                       type="text"
-                      value={jumbledInput}
+                      value={jumbledInput || ""}
                       onChange={(e) => setJumbledInput(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -4430,7 +4437,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       <div className="absolute -inset-8 bg-gradient-to-r from-amber-400/20 via-yellow-300/30 to-amber-500/20 rounded-full blur-2xl animate-spin-slow pointer-events-none" />
 
                       {currentP.photo ? (
-                        <motion.img 
+                        <img 
                           src={currentP.photo} 
                           alt={currentP.name}
                           initial={{ scale: 0, rotate: -180 }}

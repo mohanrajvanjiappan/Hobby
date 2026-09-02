@@ -1,5 +1,5 @@
 export const generateWordSearchGrid = (words: string[]) => {
-  const size = 10; // Increased size to ensure 5 words fit easily
+  const size = 6; // Increased size to ensure 5 words fit easily
   let grid: string[][] = [];
   let wordLocations: any[] = [];
   let allPlaced = false;
@@ -11,7 +11,7 @@ export const generateWordSearchGrid = (words: string[]) => {
 
   // format and sort words by length descending
   const sortedWords = [...words]
-    .map(w => w.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 8))
+    .map(w => w.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 6))
     .sort((a, b) => b.length - a.length);
 
   while (!allPlaced) {

@@ -695,11 +695,11 @@ CRITICAL RULES FOR ACCURACY:
         };
         requiredQuestionProps.push("nominatimQuery", "parentRegionQuery");
       } else if (quizType === 'word-search') {
-        contents += ` This is a 'Word Search' round. For each question, provide a list of exactly 5 words related to the theme in 'wordsToFind'. Each word MUST be a maximum of 8 characters long, uppercase, with no spaces. CRITICAL: DOUBLE CHECK THE SPELLING of every word to ensure it is a correct and valid English word. The 'question' field should just be 'Find the 5 hidden words!'. The 'correctAnswer' should be 'Words found!'.`;
+        contents += ` This is a 'Word Search' round. For each question, provide a list of exactly 3 words related to the theme in 'wordsToFind'. Each word MUST be a maximum of 6 characters long, uppercase, with no spaces. CRITICAL: DOUBLE CHECK THE SPELLING of every word to ensure it is a correct and valid English word. The 'question' field should just be 'Find the 3 hidden words!'. The 'correctAnswer' should be 'Words found!'.`;
         questionSchemaProps.wordsToFind = {
           type: Type.ARRAY,
           items: { type: Type.STRING },
-          description: "Exactly 5 words, max 8 chars each, uppercase, no spaces."
+          description: "Exactly 5 words, max 6 chars each, uppercase, no spaces."
         };
         requiredQuestionProps.push("wordsToFind");
       } else if (quizType === 'mega-quiz') {

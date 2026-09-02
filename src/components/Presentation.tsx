@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Quiz } from '../types';
 import { audioSynth } from '../lib/audio';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload, RotateCcw } from 'lucide-react';
+import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload, RotateCcw, Music, Gamepad2, Palette, Globe, Plane, Zap } from 'lucide-react';
 import quizLogo from '../assets/images/quiz_logo_1783447286811.jpg';
 import MapQuestion from './MapQuestion';
 
@@ -249,10 +249,69 @@ const ParticipantVideoFrames: React.FC<ParticipantVideoFramesProps> = ({
   );
 };
 
+const getThemeEmojis = (topic: string): string[] => {
+  const t = topic.toLowerCase();
+  if (t.includes('space') || t.includes('planet') || t.includes('universe') || t.includes('star')) {
+    return ['🚀','🛸','🌍','⭐','🌙','🪐','☄️','👽','🔭','🛰️','🌌','👨‍🚀'];
+  }
+  if (t.includes('animal') || t.includes('wildlife') || t.includes('zoo') || t.includes('pet') || t.includes('dog') || t.includes('cat')) {
+    return ['🐶','🐱','🦁','🐯','🐘','🦒','🦓','🐒','🐼','🦊','🐻','🐰'];
+  }
+  if (t.includes('food') || t.includes('cooking') || t.includes('cuisine') || t.includes('fruit')) {
+    return ['🍎','🍔','🍕','🌮','🍣','🍩','🍉','🍇','🍓','🥑','🥕','🥐'];
+  }
+  if (t.includes('sport') || t.includes('game') || t.includes('olympic') || t.includes('football')) {
+    return ['⚽','🏀','🏈','⚾','🎾','🏐','🏉','🎱','🏓','🏸','🥊','🥋'];
+  }
+  if (t.includes('music') || t.includes('band') || t.includes('song') || t.includes('instrument')) {
+    return ['🎸','🎹','🎺','🎻','🥁','🎷','🎤','🎧','🎼','🎵','🎶','📻'];
+  }
+  if (t.includes('tech') || t.includes('computer') || t.includes('science') || t.includes('robot')) {
+    return ['💻','📱','🔋','⚙️','🔬','🧪','🤖','📡','🧲','💡','💾','🖥️'];
+  }
+  if (t.includes('nature') || t.includes('plant') || t.includes('flower') || t.includes('tree')) {
+    return ['🌲','🌳','🌴','🌵','🌾','🌿','🍀','🍁','🍂','🌺','🌻','🍄'];
+  }
+  if (t.includes('vehicle') || t.includes('car') || t.includes('transport') || t.includes('drive')) {
+    return ['🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🚚','🚜'];
+  }
+  if (t.includes('movie') || t.includes('film') || t.includes('cinema') || t.includes('hollywood')) {
+    return ['🎬','🍿','🎟️','🎥','📽️','🎭','📺','📼','📸','🎞️','🏆','🌟'];
+  }
+  return ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈'];
+};
+
 export default function Presentation({ quiz, onExit }: PresentationProps) {
   const [stage, setStage] = useState<Stage>('intro');
   const [introducingPlayerIndex, setIntroducingPlayerIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+
+  const bgColors = useMemo(() => {
+    const vibrantPastels = [
+      "from-sky-400 via-blue-400 to-indigo-500",
+      "from-teal-400 via-emerald-400 to-green-500",
+      "from-rose-400 via-pink-400 to-fuchsia-500",
+      "from-amber-400 via-orange-400 to-rose-500",
+      "from-purple-400 via-violet-400 to-fuchsia-500",
+      "from-cyan-400 via-sky-400 to-blue-500",
+      "from-lime-400 via-green-400 to-emerald-500",
+      "from-orange-400 via-rose-400 to-pink-500",
+      "from-pink-400 via-rose-400 to-red-400",
+      "from-sky-400 via-indigo-400 to-purple-500",
+      "from-emerald-400 via-teal-400 to-cyan-500",
+      "from-fuchsia-400 via-purple-400 to-violet-500",
+      "from-red-400 via-rose-400 to-orange-400",
+      "from-yellow-400 via-amber-400 to-orange-400",
+      "from-indigo-400 via-purple-400 to-pink-500"
+    ];
+    if (!quiz.dynamicColors) return [];
+    const arr: string[] = [];
+    while (arr.length < quiz.questions.length + 10) {
+       const shuffled = [...vibrantPastels].sort(() => 0.5 - Math.random());
+       arr.push(...shuffled);
+    }
+    return arr;
+  }, [quiz.dynamicColors, quiz.questions.length]);
   const [timeLeft, setTimeLeft] = useState(0);
   const [clueIndex, setClueIndex] = useState(0);
   const [celebratingIndex, setCelebratingIndex] = useState(0);
@@ -673,7 +732,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               } else if (quiz.type === 'combat-mode') {
                 introSpeech = `Welcome back to Combat Mode! Today's topic is ${getActiveContextTopic(0)}. Pair up with a friend. Look at your side of the screen and answer before the time runs out!`;
               } else if (currentType === 'word-search') {
-                introSpeech = `Welcome back to Word Search! Today's topic is ${getActiveContextTopic(0)}. Find the 5 hidden words in the grid. You have 30 seconds. Look left-to-right, and top-to-bottom only!`;
+                introSpeech = `Welcome back to Word Search! Today's topic is ${getActiveContextTopic(0)}. Find the 3 hidden words in the grid. You have 30 seconds. Look left-to-right, and top-to-bottom only!`;
               }
             }
           }
@@ -1255,8 +1314,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             } else {
               if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) {
                  setHasPlayedMemoryBreak(true);
-                 const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈'];
-                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, 10);
+                 const emojis = getThemeEmojis(quiz.topic || "");
+                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 8);
                  setMemoryItems(shuffled);
                  setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]);
                  setStage('memory-break-intro');
@@ -1362,8 +1421,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             } else {
               if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) { 
                  setHasPlayedMemoryBreak(true); 
-                 const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈']; 
-                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, 10); 
+                 const emojis = getThemeEmojis(quiz.topic || "");
+                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 8); 
                  setMemoryItems(shuffled); 
                  setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]); 
                  setStage('memory-break-intro');
@@ -1650,8 +1709,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               } else {
                 if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) {
                    setHasPlayedMemoryBreak(true);
-                   const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈'];
-                   const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, 10);
+                   const emojis = getThemeEmojis(quiz.topic || "");
+                   const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 8);
                    setMemoryItems(shuffled);
                    setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]);
                    setStage('memory-break-intro');
@@ -2042,9 +2101,10 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
     }
   };
 
-  return (
-    <div className={`\${quiz.mode === 'interactive' ? 'presentation-interactive-cursor' : ''} fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white selection:bg-white/30`}>
+  const bgGradient = (quiz.dynamicColors && bgColors.length > 0) ? bgColors[currentQuestionIndex] : "from-cyan-400 via-blue-500 to-indigo-600";
 
+  return (
+    <div className={`\${quiz.mode === 'interactive' ? 'presentation-interactive-cursor' : ''} fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans bg-gradient-to-br ${bgGradient} text-white selection:bg-white/30 transition-colors duration-1000`}>
       {/* Background Floating Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
         <Star className="absolute top-12 left-[3%] w-12 h-12 text-white animate-pulse" />
@@ -2058,6 +2118,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         <Sparkles className="absolute bottom-[10%] left-[10%] w-14 h-14 text-white opacity-80" />
         <Cat className="absolute bottom-[10%] right-[8%] w-16 h-16 text-white opacity-60" />
         <Dumbbell className="absolute top-[10%] right-[15%] w-12 h-12 text-white opacity-50 transform -rotate-12" />
+        <Music className="absolute top-[50%] left-[15%] w-12 h-12 text-white opacity-40 animate-bounce" style={{ animationDelay: '1s' }} />
+        <Gamepad2 className="absolute top-[70%] left-[12%] w-16 h-16 text-white opacity-50 transform rotate-12 animate-pulse" style={{ animationDelay: '0.5s' }} />
+        <Palette className="absolute top-[20%] right-[25%] w-14 h-14 text-white opacity-45 transform -rotate-12 animate-bounce" style={{ animationDelay: '1.5s' }} />
+        <Globe className="absolute top-[80%] right-[12%] w-16 h-16 text-white opacity-60 animate-spin-slow" />
+        <Plane className="absolute top-[5%] left-[40%] w-12 h-12 text-white opacity-50 transform rotate-45 animate-pulse" style={{ animationDelay: '2s' }} />
+        <Zap className="absolute bottom-[5%] right-[40%] w-14 h-14 text-white opacity-70 animate-bounce" style={{ animationDelay: '0.2s' }} />
       </div>
 
       <button 
@@ -2139,48 +2205,67 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             ) : (
               <motion.div 
-                initial={{ scale: 0.8, opacity: 0, filter: "blur(10px)", y: 50 }}
-                animate={{ scale: 1, opacity: 1, filter: "blur(0px)", y: 0 }}
-                transition={{ type: "spring", stiffness: 100, damping: 20, duration: 1 }}
-                className="w-72 h-72 md:w-96 md:h-96 rounded-full overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-8 border-white mb-12 relative group"
+                initial={{ scale: 0.5, opacity: 0, filter: "blur(20px)", y: 100 }}
+                animate={{ scale: [0.5, 1.1, 1], opacity: 1, filter: "blur(0px)", y: 0 }}
+                transition={{ type: "spring", stiffness: 120, damping: 15, duration: 1.5 }}
+                className="relative mb-12 group"
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <img src={(quiz.mode === 'interactive' && quiz.playerPhoto) ? quiz.playerPhoto : quizLogo} alt="Quiz Time Brain Boosters" className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-700" />
+                <motion.div 
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  className="absolute -inset-4 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full blur-xl opacity-70 group-hover:opacity-100 transition-opacity duration-1000"
+                />
+                <div className="w-72 h-72 md:w-96 md:h-96 rounded-full overflow-hidden shadow-[0_0_80px_rgba(255,255,255,0.3)] border-[12px] border-white/90 relative z-10">
+                  <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/60 to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  <img 
+                    src={(quiz.mode === 'interactive' && quiz.playerPhoto) ? quiz.playerPhoto : quizLogo} 
+                    alt="Quiz Time Brain Boosters" 
+                    className="w-full h-full object-cover" 
+                  />
+                </div>
               </motion.div>
             )}
 
-            <motion.h1 
-              initial={{ opacity: 0, y: 20 }}
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="text-5xl md:text-7xl font-black mb-8 tracking-tight drop-shadow-2xl text-white"
+              transition={{ type: "spring", stiffness: 150, damping: 15, delay: 0.3 }}
+              className="relative z-10 flex flex-col items-center"
             >
-              {quiz.mode === 'interactive' && isMultipleFiles
-                ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
-                : (quiz.mode === 'interactive' && quiz.isMultiplayer && (quiz.players?.length || 1) > 1
-                  ? `Welcome ${playersState.map(p => p.name).join(', ')}!`
-                  : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
-                    ? `Battle: ${playersState.map(p => p.name).join(' vs ')}`
-                    : (quiz.mode === 'interactive' 
-                      ? `Welcome ${quiz.teamName}!` 
-                      : (quiz.type === 'combat-mode' ? 'Welcome back to Combat Mode!' : 'Welcome back to Quiz Time Brain Boosters'))))}
-            </motion.h1>
-            <motion.p 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="text-3xl md:text-4xl opacity-100 font-bold text-cyan-100 drop-shadow-lg max-w-3xl leading-snug"
-            >
-              {isMultipleFiles
-                ? `Today's rounds: ${categories.join(', ')}`
-                : (quiz.mode === 'interactive'
-                  ? (quiz.playerDetails ? quiz.playerDetails : '')
-                  : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
-                    ? `Today's topic: ${getActiveContextTopic(0)}`
-                    : (quiz.type === 'combat-mode' 
-                      ? `Today we are exploring: ${getActiveContextTopic(0)}. Pair up with a friend! Look at your side of the screen and answer before the time runs out!` 
-                      : `Today we are exploring: ${getActiveContextTopic(0)}`)))}
-            </motion.p>
+              <motion.h1 
+                animate={{ y: [0, -10, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="text-6xl md:text-8xl font-black mb-8 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-500 drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)] text-center leading-tight"
+              >
+                {quiz.mode === 'interactive' && isMultipleFiles
+                  ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
+                  : (quiz.mode === 'interactive' && quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+                    ? `Welcome ${playersState.map(p => p.name).join(', ')}!`
+                    : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+                      ? `Battle: ${playersState.map(p => p.name).join(' vs ')}`
+                      : (quiz.mode === 'interactive' 
+                        ? `Welcome ${quiz.teamName}!` 
+                        : (quiz.type === 'combat-mode' ? 'Welcome back to Combat Mode!' : 'Welcome back to Quiz Time Brain Boosters'))))}
+              </motion.h1>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.6 }}
+                className="bg-black/40 backdrop-blur-md px-10 py-6 rounded-3xl border border-white/20 shadow-2xl"
+              >
+                <p className="text-3xl md:text-5xl font-bold text-cyan-200 drop-shadow-lg text-center leading-snug">
+                  {isMultipleFiles
+                    ? `Today's rounds: ${categories.join(', ')}`
+                    : (quiz.mode === 'interactive'
+                      ? (quiz.playerDetails ? quiz.playerDetails : '')
+                      : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+                        ? `Today's topic: ${getActiveContextTopic(0)}`
+                        : (quiz.type === 'combat-mode' 
+                          ? `Today we are exploring: ${getActiveContextTopic(0)}. Pair up with a friend! Look at your side of the screen and answer before the time runs out!` 
+                          : `Today we are exploring: ${getActiveContextTopic(0)}`)))}
+                </p>
+              </motion.div>
+            </motion.div>
           </motion.div>
         )}
 
@@ -3101,10 +3186,17 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             
             {/* Top Bar */}
             <div className={`w-full flex ${quiz.mode === 'interactive' ? 'justify-start gap-4 md:gap-6 flex-wrap' : 'justify-between'} items-center ${currentType === '5-clues' || currentType === 'detective' || currentType === 'find-in-map' ? 'mb-4 md:mb-6' : 'mb-10'}`}>
-              <div className="bg-white px-8 py-3 rounded-full shadow-2xl border-4 border-slate-100">
-                <span className="text-2xl font-black text-rose-500 tracking-wider uppercase">
-                  Question {currentQuestionIndex + 1} of {quiz.questions.length}
-                </span>
+              <div className="flex gap-4 items-center">
+                <div className="bg-white px-8 py-3 rounded-full shadow-2xl border-4 border-slate-100">
+                  <span className="text-2xl font-black text-rose-500 tracking-wider uppercase">
+                    Question {currentQuestionIndex + 1} of {quiz.questions.length}
+                  </span>
+                </div>
+                {question.difficulty && (
+                  <div className="bg-amber-100 text-amber-700 px-6 py-3 rounded-full shadow-2xl font-black text-xl tracking-widest uppercase border-4 border-amber-300">
+                    {question.difficulty}
+                  </div>
+                )}
               </div>
               
               {quiz.isMultiplayer && quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && (
@@ -3602,7 +3694,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   >
                     <input
                       type="text"
-                      value={jumbledInput}
+                      value={jumbledInput || ""}
                       onChange={(e) => setJumbledInput(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -4444,7 +4536,6 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 />
                 <motion.div 
                   animate={{ y: [0, -15, 0], rotate: [-3, 3, -3] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                   className="text-8xl md:text-[10rem] mb-10 filter drop-shadow-[0_20px_20px_rgba(0,0,0,0.2)] relative z-10"
                 >
                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-amber-400/20 blur-3xl rounded-full mix-blend-multiply" />
@@ -4636,7 +4727,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       <div className="absolute -inset-8 bg-gradient-to-r from-amber-400/20 via-yellow-300/30 to-amber-500/20 rounded-full blur-2xl animate-spin-slow pointer-events-none" />
 
                       {currentP.photo ? (
-                        <motion.img 
+                        <img 
                           src={currentP.photo} 
                           alt={currentP.name}
                           initial={{ scale: 0, rotate: -180 }}

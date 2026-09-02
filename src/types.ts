@@ -29,6 +29,7 @@ export interface WordSearchData {
 export interface QuizQuestion {
   id?: string;
   category?: string;
+  difficulty?: string;
   type?: string;
   question: string;
   options?: string[];
