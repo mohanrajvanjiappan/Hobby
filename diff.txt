@@ -1,0 +1,758 @@
+--- src/components/Presentation.tsx	2026-09-02 06:51:35.045453438 +0000
++++ src/components/Presentation_test.tsx	2026-09-02 06:43:37.846303494 +0000
+@@ -3,7 +3,7 @@
+ import { Quiz } from '../types';
+ import { audioSynth } from '../lib/audio';
+ import { motion, AnimatePresence } from 'motion/react';
+-import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload, RotateCcw, Music, Gamepad2, Palette, Globe, Plane, Zap } from 'lucide-react';
++import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload, RotateCcw } from 'lucide-react';
+ import quizLogo from '../assets/images/quiz_logo_1783447286811.jpg';
+ import MapQuestion from './MapQuestion';
+ 
+@@ -249,69 +249,10 @@
+   );
+ };
+ 
+-const getThemeEmojis = (topic: string): string[] => {
+-  const t = topic.toLowerCase();
+-  if (t.includes('space') || t.includes('planet') || t.includes('universe') || t.includes('star')) {
+-    return ['🚀','🛸','🌍','⭐','🌙','🪐','☄️','👽','🔭','🛰️','🌌','👨‍🚀'];
+-  }
+-  if (t.includes('animal') || t.includes('wildlife') || t.includes('zoo') || t.includes('pet') || t.includes('dog') || t.includes('cat')) {
+-    return ['🐶','🐱','🦁','🐯','🐘','🦒','🦓','🐒','🐼','🦊','🐻','🐰'];
+-  }
+-  if (t.includes('food') || t.includes('cooking') || t.includes('cuisine') || t.includes('fruit')) {
+-    return ['🍎','🍔','🍕','🌮','🍣','🍩','🍉','🍇','🍓','🥑','🥕','🥐'];
+-  }
+-  if (t.includes('sport') || t.includes('game') || t.includes('olympic') || t.includes('football')) {
+-    return ['⚽','🏀','🏈','⚾','🎾','🏐','🏉','🎱','🏓','🏸','🥊','🥋'];
+-  }
+-  if (t.includes('music') || t.includes('band') || t.includes('song') || t.includes('instrument')) {
+-    return ['🎸','🎹','🎺','🎻','🥁','🎷','🎤','🎧','🎼','🎵','🎶','📻'];
+-  }
+-  if (t.includes('tech') || t.includes('computer') || t.includes('science') || t.includes('robot')) {
+-    return ['💻','📱','🔋','⚙️','🔬','🧪','🤖','📡','🧲','💡','💾','🖥️'];
+-  }
+-  if (t.includes('nature') || t.includes('plant') || t.includes('flower') || t.includes('tree')) {
+-    return ['🌲','🌳','🌴','🌵','🌾','🌿','🍀','🍁','🍂','🌺','🌻','🍄'];
+-  }
+-  if (t.includes('vehicle') || t.includes('car') || t.includes('transport') || t.includes('drive')) {
+-    return ['🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🚚','🚜'];
+-  }
+-  if (t.includes('movie') || t.includes('film') || t.includes('cinema') || t.includes('hollywood')) {
+-    return ['🎬','🍿','🎟️','🎥','📽️','🎭','📺','📼','📸','🎞️','🏆','🌟'];
+-  }
+-  return ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈'];
+-};
+-
+ export default function Presentation({ quiz, onExit }: PresentationProps) {
+   const [stage, setStage] = useState<Stage>('intro');
+   const [introducingPlayerIndex, setIntroducingPlayerIndex] = useState(0);
+   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+-
+-  const bgColors = useMemo(() => {
+-    const vibrantPastels = [
+-      "from-sky-400 via-blue-400 to-indigo-500",
+-      "from-teal-400 via-emerald-400 to-green-500",
+-      "from-rose-400 via-pink-400 to-fuchsia-500",
+-      "from-amber-400 via-orange-400 to-rose-500",
+-      "from-purple-400 via-violet-400 to-fuchsia-500",
+-      "from-cyan-400 via-sky-400 to-blue-500",
+-      "from-lime-400 via-green-400 to-emerald-500",
+-      "from-orange-400 via-rose-400 to-pink-500",
+-      "from-pink-400 via-rose-400 to-red-400",
+-      "from-sky-400 via-indigo-400 to-purple-500",
+-      "from-emerald-400 via-teal-400 to-cyan-500",
+-      "from-fuchsia-400 via-purple-400 to-violet-500",
+-      "from-red-400 via-rose-400 to-orange-400",
+-      "from-yellow-400 via-amber-400 to-orange-400",
+-      "from-indigo-400 via-purple-400 to-pink-500"
+-    ];
+-    if (!quiz.dynamicColors) return [];
+-    const arr: string[] = [];
+-    while (arr.length < quiz.questions.length + 10) {
+-       const shuffled = [...vibrantPastels].sort(() => 0.5 - Math.random());
+-       arr.push(...shuffled);
+-    }
+-    return arr;
+-  }, [quiz.dynamicColors, quiz.questions.length]);
+   const [timeLeft, setTimeLeft] = useState(0);
+   const [clueIndex, setClueIndex] = useState(0);
+   const [celebratingIndex, setCelebratingIndex] = useState(0);
+@@ -1314,7 +1255,7 @@
+             } else {
+               if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) {
+                  setHasPlayedMemoryBreak(true);
+-                 const emojis = getThemeEmojis(quiz.topic || "");
++                 const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈'];
+                  const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 8);
+                  setMemoryItems(shuffled);
+                  setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]);
+@@ -1421,7 +1362,7 @@
+             } else {
+               if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) { 
+                  setHasPlayedMemoryBreak(true); 
+-                 const emojis = getThemeEmojis(quiz.topic || "");
++                 const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈']; 
+                  const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 8); 
+                  setMemoryItems(shuffled); 
+                  setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]); 
+@@ -1709,7 +1650,7 @@
+               } else {
+                 if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) {
+                    setHasPlayedMemoryBreak(true);
+-                   const emojis = getThemeEmojis(quiz.topic || "");
++                   const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈'];
+                    const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 8);
+                    setMemoryItems(shuffled);
+                    setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]);
+@@ -2075,36 +2016,9 @@
+     }
+   };
+ 
+-  const getBlurStyle = () => {
+-    if (stage === 'reveal' || stage === 'quote' || stage === 'score' || stage === 'celebrate' || stage === 'badges' || stage === 'video-badges' || stage === 'outro') {
+-      return {};
+-    }
+-    
+-    const question = quiz.questions[currentQuestionIndex];
+-    const isBlurQuiz = quiz.type === 'blurred-image' || quiz.type === 'identify-image'; 
+-    const technique = question?.blurTechnique || (quiz.type === 'blurred-image' ? 'normal-blur' : null);
+-    
+-    if (!technique) return {};
+-
+-    switch (technique) {
+-      case 'heavy-blur': return { filter: 'blur(35px)' };
+-      case 'normal-blur': return { filter: 'blur(20px)' };
+-      case 'light-blur': return { filter: 'blur(8px)' };
+-      case 'grayscale-blur': return { filter: 'blur(15px) grayscale(100%)' };
+-      case 'invert-blur': return { filter: 'blur(15px) invert(100%)' };
+-      case 'sepia-blur': return { filter: 'blur(15px) sepia(100%)' };
+-      case 'hue-rotate-blur': return { filter: 'blur(15px) hue-rotate(90deg)' };
+-      case 'high-contrast-blur': return { filter: 'blur(12px) contrast(200%) saturate(150%)' };
+-      case 'pixelated-blur': return { filter: 'url(#pixelate)' };
+-      case 'zoom-blur': return { filter: 'url(#zoom-blur)' };
+-      default: return { filter: 'blur(15px)' };
+-    }
+-  };
+-
+-  const bgGradient = (quiz.dynamicColors && bgColors.length > 0) ? bgColors[currentQuestionIndex] : "from-cyan-400 via-blue-500 to-indigo-600";
+-
+   return (
+-    <div className={`${quiz.mode === 'interactive' ? 'presentation-interactive-cursor' : ''} fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans bg-gradient-to-br ${bgGradient} text-white selection:bg-white/30 transition-colors duration-1000`}>
++    <div className={`${quiz.mode === 'interactive' ? 'presentation-interactive-cursor' : ''} fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white selection:bg-white/30`}>
++
+       {/* Background Floating Elements */}
+       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+         <Star className="absolute top-12 left-[3%] w-12 h-12 text-white animate-pulse" />
+@@ -2118,12 +2032,6 @@
+         <Sparkles className="absolute bottom-[10%] left-[10%] w-14 h-14 text-white opacity-80" />
+         <Cat className="absolute bottom-[10%] right-[8%] w-16 h-16 text-white opacity-60" />
+         <Dumbbell className="absolute top-[10%] right-[15%] w-12 h-12 text-white opacity-50 transform -rotate-12" />
+-        <Music className="absolute top-[50%] left-[15%] w-12 h-12 text-white opacity-40 animate-bounce" style={{ animationDelay: '1s' }} />
+-        <Gamepad2 className="absolute top-[70%] left-[12%] w-16 h-16 text-white opacity-50 transform rotate-12 animate-pulse" style={{ animationDelay: '0.5s' }} />
+-        <Palette className="absolute top-[20%] right-[25%] w-14 h-14 text-white opacity-45 transform -rotate-12 animate-bounce" style={{ animationDelay: '1.5s' }} />
+-        <Globe className="absolute top-[80%] right-[12%] w-16 h-16 text-white opacity-60 animate-spin-slow" />
+-        <Plane className="absolute top-[5%] left-[40%] w-12 h-12 text-white opacity-50 transform rotate-45 animate-pulse" style={{ animationDelay: '2s' }} />
+-        <Zap className="absolute bottom-[5%] right-[40%] w-14 h-14 text-white opacity-70 animate-bounce" style={{ animationDelay: '0.2s' }} />
+       </div>
+ 
+       <button 
+@@ -2205,67 +2113,48 @@
+               </div>
+             ) : (
+               <motion.div 
+-                initial={{ scale: 0.5, opacity: 0, filter: "blur(20px)", y: 100 }}
+-                animate={{ scale: [0.5, 1.1, 1], opacity: 1, filter: "blur(0px)", y: 0 }}
+-                transition={{ type: "spring", stiffness: 120, damping: 15, duration: 1.5 }}
+-                className="relative mb-12 group"
++                initial={{ scale: 0.8, opacity: 0, filter: "blur(10px)", y: 50 }}
++                animate={{ scale: 1, opacity: 1, filter: "blur(0px)", y: 0 }}
++                transition={{ type: "spring", stiffness: 100, damping: 20, duration: 1 }}
++                className="w-72 h-72 md:w-96 md:h-96 rounded-full overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)] border-8 border-white mb-12 relative group"
+               >
+-                <motion.div 
+-                  animate={{ rotate: 360 }}
+-                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+-                  className="absolute -inset-4 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-full blur-xl opacity-70 group-hover:opacity-100 transition-opacity duration-1000"
+-                />
+-                <div className="w-72 h-72 md:w-96 md:h-96 rounded-full overflow-hidden shadow-[0_0_80px_rgba(255,255,255,0.3)] border-[12px] border-white/90 relative z-10">
+-                  <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/60 to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+-                  <img 
+-                    src={(quiz.mode === 'interactive' && quiz.playerPhoto) ? quiz.playerPhoto : quizLogo} 
+-                    alt="Quiz Time Brain Boosters" 
+-                    className="w-full h-full object-cover" 
+-                  />
+-                </div>
++                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity" />
++                <img src={(quiz.mode === 'interactive' && quiz.playerPhoto) ? quiz.playerPhoto : quizLogo} alt="Quiz Time Brain Boosters" className="w-full h-full object-cover transform hover:scale-110 transition-transform duration-700" />
+               </motion.div>
+             )}
+ 
+-            <motion.div
+-              initial={{ opacity: 0, y: 40 }}
++            <motion.h1 
++              initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+-              transition={{ type: "spring", stiffness: 150, damping: 15, delay: 0.3 }}
+-              className="relative z-10 flex flex-col items-center"
++              transition={{ type: "spring", stiffness: 200, damping: 20 }}
++              className="text-5xl md:text-7xl font-black mb-8 tracking-tight drop-shadow-2xl text-white"
+             >
+-              <motion.h1 
+-                animate={{ y: [0, -10, 0] }}
+-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+-                className="text-6xl md:text-8xl font-black mb-8 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-500 drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)] text-center leading-tight"
+-              >
+-                {quiz.mode === 'interactive' && isMultipleFiles
+-                  ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
+-                  : (quiz.mode === 'interactive' && quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+-                    ? `Welcome ${playersState.map(p => p.name).join(', ')}!`
+-                    : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+-                      ? `Battle: ${playersState.map(p => p.name).join(' vs ')}`
+-                      : (quiz.mode === 'interactive' 
+-                        ? `Welcome ${quiz.teamName}!` 
+-                        : (quiz.type === 'combat-mode' ? 'Welcome back to Combat Mode!' : 'Welcome back to Quiz Time Brain Boosters'))))}
+-              </motion.h1>
+-              <motion.div
+-                initial={{ opacity: 0, scale: 0.8 }}
+-                animate={{ opacity: 1, scale: 1 }}
+-                transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.6 }}
+-                className="bg-black/40 backdrop-blur-md px-10 py-6 rounded-3xl border border-white/20 shadow-2xl"
+-              >
+-                <p className="text-3xl md:text-5xl font-bold text-cyan-200 drop-shadow-lg text-center leading-snug">
+-                  {isMultipleFiles
+-                    ? `Today's rounds: ${categories.join(', ')}`
+-                    : (quiz.mode === 'interactive'
+-                      ? (quiz.playerDetails ? quiz.playerDetails : '')
+-                      : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
+-                        ? `Today's topic: ${getActiveContextTopic(0)}`
+-                        : (quiz.type === 'combat-mode' 
+-                          ? `Today we are exploring: ${getActiveContextTopic(0)}. Pair up with a friend! Look at your side of the screen and answer before the time runs out!` 
+-                          : `Today we are exploring: ${getActiveContextTopic(0)}`)))}
+-                </p>
+-              </motion.div>
+-            </motion.div>
++              {quiz.mode === 'interactive' && isMultipleFiles
++                ? `It's Challenge between ${playersState.map(p => p.name).join(' and ')}`
++                : (quiz.mode === 'interactive' && quiz.isMultiplayer && (quiz.players?.length || 1) > 1
++                  ? `Welcome ${playersState.map(p => p.name).join(', ')}!`
++                  : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
++                    ? `Battle: ${playersState.map(p => p.name).join(' vs ')}`
++                    : (quiz.mode === 'interactive' 
++                      ? `Welcome ${quiz.teamName}!` 
++                      : (quiz.type === 'combat-mode' ? 'Welcome back to Combat Mode!' : 'Welcome back to Quiz Time Brain Boosters'))))}
++            </motion.h1>
++            <motion.p 
++              initial={{ opacity: 0 }}
++              animate={{ opacity: 1 }}
++              transition={{ type: "spring", stiffness: 200, damping: 20 }}
++              className="text-3xl md:text-4xl opacity-100 font-bold text-cyan-100 drop-shadow-lg max-w-3xl leading-snug"
++            >
++              {isMultipleFiles
++                ? `Today's rounds: ${categories.join(', ')}`
++                : (quiz.mode === 'interactive'
++                  ? (quiz.playerDetails ? quiz.playerDetails : '')
++                  : (quiz.isMultiplayer && (quiz.players?.length || 1) > 1
++                    ? `Today's topic: ${getActiveContextTopic(0)}`
++                    : (quiz.type === 'combat-mode' 
++                      ? `Today we are exploring: ${getActiveContextTopic(0)}. Pair up with a friend! Look at your side of the screen and answer before the time runs out!` 
++                      : `Today we are exploring: ${getActiveContextTopic(0)}`)))}
++            </motion.p>
+           </motion.div>
+         )}
+ 
+@@ -3232,90 +3121,62 @@
+ 
+             {/* Question Card */}
+             {quiz.type === 'combat-mode' ? (
+-              <div className="flex-1 w-full flex flex-col md:flex-row gap-8 md:gap-12 overflow-hidden mb-6 z-10 relative px-4 py-8">
+-                {/* VS Badge */}
+-                <motion.div 
+-                   initial={{ scale: 0, opacity: 0, rotate: -180 }}
+-                   animate={{ scale: 1, opacity: 1, rotate: 0 }}
+-                   transition={{ duration: 0.8, type: 'spring', bounce: 0.6, delay: 0.5 }}
+-                   className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-yellow-400 to-red-600 rounded-full flex items-center justify-center border-[8px] md:border-[12px] border-white shadow-[0_0_60px_rgba(239,68,68,0.8)] text-white font-black italic text-4xl md:text-6xl"
+-                >
+-                   VS
+-                </motion.div>
+-
++              <div className="flex-1 w-full flex gap-4 md:gap-8 overflow-hidden mb-6 z-10">
+                 {/* Left Player */}
+-                <motion.div 
+-                   initial={{ x: -100, opacity: 0, rotateY: -10 }}
+-                   animate={{ x: 0, opacity: 1, rotateY: 0 }}
+-                   transition={{ duration: 0.6, type: 'spring' }}
+-                   className="flex-1 flex flex-col bg-white/95 backdrop-blur-xl rounded-[3rem] shadow-[0_30px_70px_rgba(0,0,0,0.3)] border-b-[16px] border-indigo-400 p-8 md:p-12 relative overflow-visible"
+-                >
+-                  <div className="absolute -top-16 -left-16 w-48 h-48 bg-indigo-500/20 blur-3xl rounded-full pointer-events-none" />
+-                  <div className="absolute top-0 right-0 w-full h-2 bg-gradient-to-r from-transparent to-indigo-500/30" />
+-                  
+-                  <h3 className="text-indigo-600 font-black tracking-widest uppercase mb-4 text-2xl relative z-10 flex items-center gap-3 bg-indigo-50 inline-block px-6 py-2 rounded-full self-start shadow-inner border-2 border-indigo-100">
+-                    <Sparkles className="w-6 h-6" /> Player 1
+-                  </h3>
+-                  <h2 className="font-extrabold text-slate-800 text-3xl md:text-5xl lg:text-6xl leading-tight mb-8 drop-shadow-sm flex-1 relative z-10">
++                <div className="flex-1 flex flex-col bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-b-[12px] border-slate-200 p-6 md:p-10 relative overflow-hidden">
++                  <div className="absolute top-0 right-0 w-32 h-32 bg-slate-100 rounded-full -mr-16 -mt-16" />
++                  <h3 className="text-slate-500 font-black tracking-widest uppercase mb-4 text-xl relative z-10">Player 1</h3>
++                  <h2 className="font-extrabold text-slate-800 text-3xl md:text-4xl lg:text-5xl leading-tight mb-8 drop-shadow-sm flex-1 relative z-10">
+                     {question.combatLeft?.question}
+                   </h2>
+                   <div className="flex flex-col gap-4 w-full mt-auto relative z-10">
+                     {question.combatLeft?.options?.map((option, i) => {
+                       const isCorrect = option === question.combatLeft?.correctAnswer;
+                       const isReveal = stage === 'reveal';
+-                      let cardClass = "bg-slate-100 text-slate-800 border-[6px] border-slate-200 hover:border-indigo-300";
++                      let cardClass = "bg-slate-100 text-slate-800 border-2 border-slate-200";
+                       if (isReveal) {
+-                        if (isCorrect) cardClass = "bg-gradient-to-r from-emerald-400 to-emerald-500 text-white border-[6px] border-emerald-600 shadow-[0_0_30px_rgba(16,185,129,0.6)] scale-[1.03]";
+-                        else cardClass = "bg-slate-50 text-slate-300 border-[6px] border-transparent opacity-50";
++                        if (isCorrect) cardClass = "bg-emerald-500 text-white border-2 border-emerald-600 shadow-xl scale-[1.02]";
++                        else cardClass = "bg-slate-50 text-slate-400 border-2 border-transparent opacity-60";
+                       }
+                       return (
+-                        <motion.div key={`l-${i}`} className={`px-6 py-4 rounded-3xl text-xl md:text-2xl font-bold flex items-center gap-5 transition-all duration-500 ${cardClass}`}>
+-                          <div className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center font-black text-xl shadow-inner ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-white text-slate-400'}`}>
+-                            {['A','B','C','D'][i]}
++                        <motion.div key={`l-${i}`} className={`px-6 py-4 rounded-2xl text-xl md:text-2xl font-bold flex items-center gap-4 transition-all duration-500 ${cardClass}`}>
++                          <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-black text-lg ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
++                            {optionLetters[i]}
+                           </div>
+                           <span className="leading-tight">{option}</span>
+                         </motion.div>
+                       );
+                     })}
+                   </div>
+-                </motion.div>
+-                
++                </div>
++
+                 {/* Right Player */}
+-                <motion.div 
+-                   initial={{ x: 100, opacity: 0, rotateY: 10 }}
+-                   animate={{ x: 0, opacity: 1, rotateY: 0 }}
+-                   transition={{ duration: 0.6, type: 'spring' }}
+-                   className="flex-1 flex flex-col bg-white/95 backdrop-blur-xl rounded-[3rem] shadow-[0_30px_70px_rgba(0,0,0,0.3)] border-b-[16px] border-rose-400 p-8 md:p-12 relative overflow-visible"
+-                >
+-                  <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-rose-500/20 blur-3xl rounded-full pointer-events-none" />
+-                  <div className="absolute top-0 right-0 w-full h-2 bg-gradient-to-l from-transparent to-rose-500/30" />
+-                  
+-                  <h3 className="text-rose-600 font-black tracking-widest uppercase mb-4 text-2xl relative z-10 flex items-center gap-3 bg-rose-50 inline-block px-6 py-2 rounded-full self-start shadow-inner border-2 border-rose-100">
+-                    <Rocket className="w-6 h-6" /> Player 2
+-                  </h3>
+-                  <h2 className="font-extrabold text-slate-800 text-3xl md:text-5xl lg:text-6xl leading-tight mb-8 drop-shadow-sm flex-1 relative z-10">
++                <div className="flex-1 flex flex-col bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-b-[12px] border-slate-200 p-6 md:p-10 relative overflow-hidden">
++                  <div className="absolute top-0 left-0 w-32 h-32 bg-slate-100 rounded-full -ml-16 -mt-16" />
++                  <h3 className="text-slate-500 font-black tracking-widest uppercase mb-4 text-xl text-right relative z-10">Player 2</h3>
++                  <h2 className="font-extrabold text-slate-800 text-3xl md:text-4xl lg:text-5xl leading-tight mb-8 drop-shadow-sm flex-1 text-right relative z-10">
+                     {question.combatRight?.question}
+                   </h2>
+                   <div className="flex flex-col gap-4 w-full mt-auto relative z-10">
+                     {question.combatRight?.options?.map((option, i) => {
+                       const isCorrect = option === question.combatRight?.correctAnswer;
+                       const isReveal = stage === 'reveal';
+-                      let cardClass = "bg-slate-100 text-slate-800 border-[6px] border-slate-200 hover:border-rose-300";
++                      let cardClass = "bg-slate-100 text-slate-800 border-2 border-slate-200";
+                       if (isReveal) {
+-                        if (isCorrect) cardClass = "bg-gradient-to-r from-emerald-400 to-emerald-500 text-white border-[6px] border-emerald-600 shadow-[0_0_30px_rgba(16,185,129,0.6)] scale-[1.03]";
+-                        else cardClass = "bg-slate-50 text-slate-300 border-[6px] border-transparent opacity-50";
++                        if (isCorrect) cardClass = "bg-emerald-500 text-white border-2 border-emerald-600 shadow-xl scale-[1.02]";
++                        else cardClass = "bg-slate-50 text-slate-400 border-2 border-transparent opacity-60";
+                       }
+                       return (
+-                        <motion.div key={`r-${i}`} className={`px-6 py-4 rounded-3xl text-xl md:text-2xl font-bold flex items-center gap-5 transition-all duration-500 ${cardClass}`}>
+-                          <div className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center font-black text-xl shadow-inner ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-white text-slate-400'}`}>
+-                            {['A','B','C','D'][i]}
++                        <motion.div key={`r-${i}`} className={`px-6 py-4 rounded-2xl text-xl md:text-2xl font-bold flex items-center gap-4 transition-all duration-500 ${cardClass}`}>
++                          <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-black text-lg ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
++                            {optionLetters[i]}
+                           </div>
+                           <span className="leading-tight">{option}</span>
+                         </motion.div>
+                       );
+                     })}
+                   </div>
+-                </motion.div>
++                </div>
+               </div>
+             ) : (
+               <>
+@@ -3334,8 +3195,7 @@
+                       <img 
+                         src={uploadedImages[currentQuestionIndex] || question.imageUrl} 
+                         alt="Identify this" 
+-                        className="w-full h-full object-contain bg-slate-50 transition-all duration-1000 ease-in-out" 
+-                        style={getBlurStyle()} 
++                        className="w-full h-full object-contain bg-slate-50" 
+                         crossOrigin="anonymous"
+                         referrerPolicy="no-referrer"
+                         onError={(e) => { if (question.imagePreviewUrl && e.currentTarget.src !== question.imagePreviewUrl) { e.currentTarget.src = question.imagePreviewUrl; } else { setImageError(true); } }}
+@@ -3358,7 +3218,7 @@
+               
+               {isJumbledLetters && (
+                 <div className={`flex flex-col ${quiz.mode === 'interactive' ? 'items-start text-left' : 'items-center'} gap-8 w-full mt-2`}>
+-                  <div className={`flex flex-wrap gap-3 sm:gap-4 md:gap-6 ${quiz.mode === 'interactive' ? 'justify-start' : 'justify-center'} w-full relative z-10`}>
++                  <div className={`flex flex-wrap gap-2 sm:gap-3 md:gap-4 ${quiz.mode === 'interactive' ? 'justify-start' : 'justify-center'} w-full`}>
+                     {(() => {
+                       const rawAnswer = question.correctAnswer || question.answer || question.word || question.correct_answer || question.brand_name || '';
+                       const word = rawAnswer.replace(/\s/g, '').toUpperCase();
+@@ -3369,14 +3229,12 @@
+                         <motion.div 
+                           key={`${item.id}-${i}`}
+                           layout
+-                          initial={{ scale: 0, rotateY: 180, opacity: 0 }}
+-                          animate={{ scale: 1, rotateY: 0, opacity: 1 }}
+-                          transition={{ delay: stage === 'reveal' ? i * 0.05 : i * 0.08, type: 'spring', stiffness: 200, damping: 15 }}
+-                          whileHover={{ scale: 1.05, y: -10, rotateZ: (Math.random() - 0.5) * 10 }}
+-                          className={`w-16 h-22 sm:w-20 sm:h-28 md:w-28 md:h-36 lg:w-32 lg:h-40 rounded-3xl shadow-[0_15px_30px_rgba(0,0,0,0.2)] flex items-center justify-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black border-b-[12px] md:border-b-[16px] uppercase z-10 transition-colors duration-500 ${stage === 'reveal' ? 'bg-gradient-to-b from-emerald-400 to-emerald-600 text-white border-emerald-800 shadow-[0_0_50px_rgba(16,185,129,0.8)]' : 'bg-gradient-to-b from-white to-slate-100 text-indigo-700 border-indigo-300 backdrop-blur-md'}`}
++                          initial={{ scale: 0 }}
++                          animate={{ scale: 1 }}
++                          transition={{ delay: stage === 'reveal' ? 0 : i * 0.08, type: 'spring', stiffness: 300, damping: 20 }}
++                          className={`w-16 h-22 sm:w-20 sm:h-28 md:w-28 md:h-36 lg:w-32 lg:h-40 rounded-2xl shadow-[0_10px_20px_rgba(0,0,0,0.15)] flex items-center justify-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black border-b-[10px] md:border-b-[14px] uppercase z-10 transition-colors ${stage === 'reveal' ? 'bg-emerald-500 text-white border-emerald-700 shadow-[0_0_40px_rgba(16,185,129,0.5)]' : 'bg-slate-100 text-indigo-600 border-indigo-200'}`}
+                         >
+-                          <span className="drop-shadow-md relative z-10">{item.char}</span>
+-                          <div className="absolute inset-0 bg-white/20 rounded-3xl opacity-0 hover:opacity-100 transition-opacity" />
++                          {item.char}
+                         </motion.div>
+                       ));
+                     })()}
+@@ -3632,36 +3490,31 @@
+             )}
+             
+             {(currentType === '5-clues' || question.type === '5-clues') && !isJumbledLetters && (
+-              <div className="flex-1 w-full shrink-0 mb-6 flex flex-col gap-3 md:gap-4 relative px-4 z-10">
++              <div className="flex-1 w-full shrink-0 mb-6 flex flex-col gap-2 md:gap-3">
+                 {question.clues?.map((clue, i) => {
+                   const isVisible = i <= clueIndex || stage === 'reveal';
+                   return (
+                     <motion.div
+                       key={i}
+-                      initial={{ opacity: 0, x: -100, rotateY: -20, scale: 0.8 }}
+-                      animate={isVisible ? { opacity: 1, x: 0, rotateY: 0, scale: 1 } : { opacity: 0, x: -100, rotateY: -20, scale: 0.8 }}
+-                      transition={{ duration: 0.6, type: 'spring', bounce: 0.4 }}
+-                      className={`px-6 py-4 md:px-8 md:py-6 rounded-3xl text-xl md:text-3xl font-bold shadow-[0_15px_40px_rgba(0,0,0,0.15)] flex items-center gap-6 transform transition-all ${isVisible ? 'bg-white/95 backdrop-blur-xl text-slate-800 border-l-[12px] border-indigo-500' : 'hidden'}`}
++                      initial={{ opacity: 0, y: 20 }}
++                      animate={isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
++                      transition={{ duration: 0.5 }}
++                      className={`px-4 py-3 md:px-6 md:py-4 rounded-2xl text-xl md:text-2xl lg:text-3xl font-bold shadow-lg flex items-center gap-4 transform transition-all ${isVisible ? 'bg-white text-slate-800 border-l-8 border-indigo-500' : 'hidden'}`}
+                     >
+-                      <div className="w-12 h-12 md:w-16 md:h-16 shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-2xl md:text-3xl shadow-[0_0_20px_rgba(99,102,241,0.5)] border-4 border-indigo-200">
++                      <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-xl md:text-2xl shadow-inner">
+                         {i + 1}
+                       </div>
+-                      <span className="leading-snug tracking-tight relative z-10">{clue}</span>
+-                      
+-                      {/* Decorative background element for clue card */}
+-                      <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-indigo-50/50 to-transparent rounded-r-3xl pointer-events-none" />
++                      <span className="leading-tight">{clue}</span>
+                     </motion.div>
+                   );
+                 })}
+                 {stage === 'reveal' && (
+                   <motion.div
+-                    initial={{ scale: 0.9, opacity: 0, y: 50 }}
+-                    animate={{ scale: 1, opacity: 1, y: 0 }}
+-                    transition={{ type: 'spring', bounce: 0.5, delay: 0.5 }}
+-                    className="mt-6 px-8 py-6 rounded-[2rem] bg-gradient-to-b from-emerald-400 to-emerald-600 text-white border-b-[12px] border-emerald-800 shadow-[0_20px_50px_rgba(16,185,129,0.5)] text-3xl md:text-5xl font-black text-center relative overflow-hidden"
++                    initial={{ scale: 0.9, opacity: 0 }}
++                    animate={{ scale: 1, opacity: 1 }}
++                    className="mt-2 px-6 py-4 rounded-3xl bg-emerald-500 text-white border-b-8 border-emerald-700 shadow-[0_0_50px_rgba(16,185,129,0.8)] text-3xl md:text-4xl font-black text-center"
+                   >
+-                    <div className="absolute -top-24 -right-24 w-48 h-48 bg-white/20 blur-3xl rounded-full" />
+-                    <span className="relative z-10">Answer: {question.correctAnswer}</span>
++                    Answer: {question.correctAnswer}
+                   </motion.div>
+                 )}
+               </div>
+@@ -3761,87 +3614,33 @@
+             )}
+ 
+             {currentType === 'word-search' && question.grid && (
+-              <div className="w-full flex-1 flex flex-col items-center justify-center mt-2 mb-6 relative z-10">
+-                <div className="relative p-6 md:p-8 bg-white/80 backdrop-blur-xl rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.15)] border-b-[16px] border-indigo-400 overflow-hidden group">
+-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/10 pointer-events-none" />
+-                  
+-                  {/* Decorative corner accents */}
+-                  <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-indigo-300 rounded-tl-[2.5rem] opacity-50 pointer-events-none" />
+-                  <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-indigo-300 rounded-br-[2.5rem] opacity-50 pointer-events-none" />
+-
+-                  <div className="grid grid-cols-10 gap-2 md:gap-3 relative z-10">
+-                    {question.grid.map((row, r) => (
+-                      row.map((cell, c) => {
+-                        let isHighlighted = false;
+-                        let highlightIndex = 0;
+-                        if (stage === 'reveal' && question.wordLocations) {
+-                          const wordLocIndex = question.wordLocations.findIndex(w => w.cells.some(cellPos => cellPos.r === r && cellPos.c === c));
+-                          if (wordLocIndex !== -1) {
+-                            isHighlighted = true;
+-                            highlightIndex = wordLocIndex;
+-                          }
+-                        }
+-
+-                        // Colors for different words
+-                        const highlightColors = [
+-                          'from-emerald-400 to-emerald-600 border-emerald-700 shadow-emerald-500/50',
+-                          'from-rose-400 to-rose-600 border-rose-700 shadow-rose-500/50',
+-                          'from-amber-400 to-amber-600 border-amber-700 shadow-amber-500/50',
+-                          'from-cyan-400 to-cyan-600 border-cyan-700 shadow-cyan-500/50',
+-                          'from-fuchsia-400 to-fuchsia-600 border-fuchsia-700 shadow-fuchsia-500/50',
+-                        ];
+-                        const colorClass = isHighlighted ? highlightColors[highlightIndex % highlightColors.length] : 'from-slate-50 to-white border-slate-200 text-slate-700';
++              <div className="w-full flex-1 flex flex-col items-center justify-center mt-4 mb-6">
++                <div className="grid grid-cols-10 gap-1 md:gap-2 bg-indigo-100 p-3 md:p-5 rounded-3xl shadow-inner border-8 border-indigo-200">
++                  {question.grid.map((row, r) => (
++                    row.map((cell, c) => {
++                      let isHighlighted = false;
++                      if (stage === 'reveal' && question.wordLocations) {
++                        const wordLoc = question.wordLocations.find(w => w.cells.some(cellPos => cellPos.r === r && cellPos.c === c));
++                        if (wordLoc) isHighlighted = true;
++                      }
+ 
+-                        return (
+-                          <motion.div 
+-                            key={`${r}-${c}`} 
+-                            initial={{ scale: 0, opacity: 0, rotateX: -90 }}
+-                            animate={{ scale: 1, opacity: 1, rotateX: 0 }}
+-                            transition={{ delay: (r * 10 + c) * 0.015, type: 'spring', stiffness: 200, damping: 12 }}
+-                            whileHover={!isHighlighted ? { scale: 1.1, zIndex: 20, rotateZ: (Math.random() - 0.5) * 10, y: -4 } : {}}
+-                            className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-[4rem] lg:h-[4rem] flex items-center justify-center rounded-2xl text-2xl sm:text-3xl md:text-4xl lg:text-[2.2rem] font-black transition-all duration-500 border-b-[6px] md:border-b-[8px] bg-gradient-to-b ${isHighlighted ? `text-white scale-110 z-10 shadow-[0_10px_25px_var(--tw-shadow-color)] ${colorClass}` : `${colorClass} shadow-md`}`}
+-                          >
+-                             <span className={isHighlighted ? "drop-shadow-md" : ""}>{cell}</span>
+-                          </motion.div>
+-                        );
+-                      })
+-                    ))}
+-                  </div>
++                      return (
++                        <div key={`${r}-${c}`} className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-[4rem] lg:h-[4rem] flex items-center justify-center rounded-xl md:rounded-2xl text-2xl sm:text-3xl md:text-4xl lg:text-[2.2rem] font-black transition-all duration-500 border-b-[6px] ${isHighlighted ? 'bg-emerald-400 text-white border-emerald-600 shadow-[0_0_20px_rgba(16,185,129,0.8)] z-10 scale-110' : 'bg-white text-slate-700 border-slate-200'}`}>
++                           {cell}
++                        </div>
++                      );
++                    })
++                  ))}
+                 </div>
+-
+-                <AnimatePresence>
+-                  {stage === 'reveal' && question.wordsToFind && (
+-                    <motion.div 
+-                      initial={{ opacity: 0, y: 40, scale: 0.9 }} 
+-                      animate={{ opacity: 1, y: 0, scale: 1 }} 
+-                      transition={{ delay: 0.8, type: 'spring', bounce: 0.5 }}
+-                      className="mt-8 flex flex-wrap gap-4 justify-center max-w-4xl"
+-                    >
+-                      {question.wordsToFind.map((word, i) => {
+-                        const highlightColors = [
+-                          'text-emerald-700 bg-emerald-100 border-emerald-300',
+-                          'text-rose-700 bg-rose-100 border-rose-300',
+-                          'text-amber-700 bg-amber-100 border-amber-300',
+-                          'text-cyan-700 bg-cyan-100 border-cyan-300',
+-                          'text-fuchsia-700 bg-fuchsia-100 border-fuchsia-300',
+-                        ];
+-                        const colorClass = highlightColors[i % highlightColors.length];
+-                        return (
+-                          <motion.div 
+-                            key={word} 
+-                            initial={{ opacity: 0, x: -20 }}
+-                            animate={{ opacity: 1, x: 0 }}
+-                            transition={{ delay: 1 + i * 0.15 }}
+-                            className={`px-6 py-3 font-black text-2xl md:text-3xl rounded-2xl shadow-lg border-b-[6px] uppercase tracking-widest flex items-center gap-3 ${colorClass}`}
+-                          >
+-                            <Sparkles className="w-6 h-6 opacity-80" />
+-                            {word}
+-                          </motion.div>
+-                        );
+-                      })}
+-                    </motion.div>
+-                  )}
+-                </AnimatePresence>
++                {stage === 'reveal' && question.wordsToFind && (
++                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8 flex flex-wrap gap-4 justify-center max-w-4xl">
++                    {question.wordsToFind.map((word, i) => (
++                      <div key={word} className="px-6 py-3 bg-white text-emerald-600 font-black text-2xl md:text-3xl rounded-full shadow-lg border-4 border-emerald-100 uppercase tracking-widest">
++                        {word}
++                      </div>
++                    ))}
++                  </motion.div>
++                )}
+               </div>
+             )}
+ 
+@@ -3865,59 +3664,7 @@
+               </div>
+             )}
+ 
+-            {currentType === 'a-to-z' && (
+-              <div className="w-full flex flex-col items-center justify-center relative z-10 my-4 md:my-8">
+-                {(() => {
+-                  const match = question.question.match(/letter\s+([A-Z])/i);
+-                  const letter = match ? match[1].toUpperCase() : (question.question.trim().slice(-1).toUpperCase());
+-                  
+-                  return (
+-                    <div className="flex flex-col items-center relative w-full max-w-5xl mx-auto">
+-                      <motion.div 
+-                        initial={{ scale: 0, rotateY: -180, opacity: 0 }}
+-                        animate={{ scale: 1, rotateY: 0, opacity: 1 }}
+-                        transition={{ type: 'spring', bounce: 0.6, duration: 1.5 }}
+-                        whileHover={{ scale: 1.05, rotateZ: (Math.random() - 0.5) * 5 }}
+-                        className="w-40 h-40 md:w-56 md:h-56 bg-gradient-to-br from-amber-300 via-amber-400 to-orange-500 rounded-[2.5rem] md:rounded-[3.5rem] shadow-[0_20px_50px_rgba(245,158,11,0.4)] border-[10px] md:border-[16px] border-white/80 flex items-center justify-center mb-8 relative z-20 overflow-hidden"
+-                      >
+-                         <motion.div 
+-                           className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent skew-x-[-20deg]"
+-                           animate={{ x: ['-200%', '200%'] }}
+-                           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+-                         />
+-                         <span className="text-[6rem] md:text-[10rem] font-black text-white drop-shadow-[0_10px_20px_rgba(0,0,0,0.3)] leading-none">{letter}</span>
+-                      </motion.div>
+-
+-                      <AnimatePresence>
+-                        {stage === 'reveal' && (
+-                          <motion.div
+-                            initial={{ scale: 0.8, y: -40, opacity: 0 }}
+-                            animate={{ scale: 1, y: 0, opacity: 1 }}
+-                            transition={{ type: 'spring', bounce: 0.5, delay: 0.3 }}
+-                            className="w-full px-8 py-8 md:px-12 md:py-10 bg-white/95 backdrop-blur-xl border-b-[12px] border-emerald-500 rounded-[3rem] shadow-[0_20px_60px_rgba(0,0,0,0.2)] text-center relative z-10"
+-                          >
+-                             <h3 className="text-xl md:text-2xl text-emerald-600 font-black uppercase tracking-widest mb-4 flex items-center justify-center gap-3">
+-                               <Award className="w-8 h-8" /> Correct Answer
+-                             </h3>
+-                             <p className="text-4xl md:text-6xl lg:text-7xl font-black text-slate-800 tracking-tight leading-tight mb-2">{question.correctAnswer}</p>
+-                             {question.insight && (
+-                               <div className="mt-8 px-6 py-5 md:px-8 md:py-6 bg-emerald-50 rounded-[2rem] border-4 border-emerald-100 flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-6 text-center md:text-left">
+-                                 <div className="w-14 h-14 shrink-0 bg-emerald-100 rounded-full flex items-center justify-center shadow-inner">
+-                                   <Lightbulb className="w-8 h-8 text-emerald-500" />
+-                                 </div>
+-                                 <p className="text-lg md:text-2xl text-slate-700 font-bold leading-relaxed">{question.insight}</p>
+-                               </div>
+-                             )}
+-                          </motion.div>
+-                        )}
+-                      </AnimatePresence>
+-                    </div>
+-                  );
+-                })()}
+-              </div>
+-            )}
+-
+-            {!isJumbledLetters && currentType !== 'a-to-z' && currentType !== 'text-presentation' && currentType !== '5-clues' && currentType !== 'detective' && currentType !== 'jumbled-letters' && currentType !== 'match-the-following' && currentType !== 'word-search' && (
++            {!isJumbledLetters && currentType !== 'text-presentation' && currentType !== '5-clues' && currentType !== 'detective' && currentType !== 'jumbled-letters' && currentType !== 'match-the-following' && currentType !== 'word-search' && (
+               <div className={`flex flex-col w-full ${quiz.mode === 'interactive' ? 'items-start text-left' : 'items-center'}`}>
+                 <div className={`grid grid-cols-1 ${quiz.mode === 'interactive' ? 'lg:grid-cols-2' : 'md:grid-cols-2'} gap-6 w-full shrink-0 mb-6`}>
+                   {( (question.type === 'True or False' || (question as any).category === 'True or False') && (!question.options || question.options.length === 0) ? ['True', 'False'] : question.options )?.map((option, i) => {
+@@ -4206,15 +3953,11 @@
+                   </h2>
+                 )}
+                 
+-                
+-                <div className="grid gap-4 md:gap-8 justify-center items-center content-center w-full flex-1 min-h-0 py-4" style={{ gridTemplateColumns: `repeat(${Math.ceil(memoryItems.length / 2)}, minmax(0, auto))` }}>
+-                  {memoryItems.map((item, idx) => {
+-                    const count = memoryItems.length;
+-                    const sizeClass = count <= 6 ? 'w-36 h-36 md:w-56 md:h-56 text-[6rem] md:text-[8rem]' : count <= 10 ? 'w-32 h-32 md:w-48 md:h-48 text-[5rem] md:text-[7rem]' : count <= 15 ? 'w-28 h-28 md:w-40 md:h-40 text-[4rem] md:text-[6rem]' : 'w-24 h-24 md:w-32 md:h-32 text-[3.5rem] md:text-[5rem]';
+-                    return (
++                <div className="grid grid-cols-5 gap-4 md:gap-6 w-full">
++                  {memoryItems.map((item, idx) => (
+                     <motion.div
+                       key={idx}
+-                      className={`bg-white/10 backdrop-blur-md border-4 border-white/20 rounded-3xl flex items-center justify-center shadow-2xl relative cursor-pointer ${sizeClass}`}
++                      className="bg-white/10 backdrop-blur-md border-4 border-white/20 rounded-3xl aspect-square flex items-center justify-center text-7xl md:text-[8rem] shadow-2xl relative cursor-pointer"
+                       animate={
+                         stage === 'memory-break-reveal' && item === memoryTarget 
+                         ? { scale: [1, 1.1, 1], borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.4)' } 
+@@ -4236,8 +3979,7 @@
+                         <span className={`drop-shadow-[0_0_15px_rgba(0,0,0,0.3)] ${stage === 'memory-break-reveal' && item !== memoryTarget ? "opacity-20 grayscale" : "opacity-100"}`}>{item}</span>
+                       )}
+                     </motion.div>
+-                  );
+-                  })}
++                  ))}
+                 </div>
+                 
+                 {stage !== 'memory-break-reveal' && (
+@@ -4524,26 +4266,15 @@
+                {quiz.mode === 'interactive' ? `${currentBadge.player}'s Milestone!` : 'Audience Milestone!'}
+              </h1>
+              <motion.div
+-                initial={{ scale: 0.8, opacity: 0, y: 50, rotateX: -15 }}
+-                animate={{ scale: 1, opacity: 1, y: 0, rotateX: 0 }}
+-                transition={{ type: 'spring', bounce: 0.5, duration: 1 }}
+-                className={`relative overflow-hidden bg-white/95 backdrop-blur-xl rounded-[3rem] p-12 flex flex-col items-center text-center shadow-[0_40px_100px_rgba(0,0,0,0.5)] border-4 ${currentBadge.color} w-full max-w-lg`}
++                initial={{ scale: 0, opacity: 0, y: 50 }}
++                animate={{ scale: 1, opacity: 1, y: 0 }}
++                transition={{ type: 'spring', bounce: 0.5 }}
++                className={`bg-white rounded-3xl p-12 flex flex-col items-center text-center shadow-[0_40px_100px_rgba(0,0,0,0.5)] border-b-[16px] ${currentBadge.color} w-full max-w-md`}
+               >
+-                <motion.div 
+-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent skew-x-[-20deg]"
+-                  animate={{ x: ['-200%', '200%'] }}
+-                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1 }}
+-                />
+-                <motion.div 
+-                  animate={{ y: [0, -15, 0], rotate: [-3, 3, -3] }}
+-                  className="text-8xl md:text-[10rem] mb-10 filter drop-shadow-[0_20px_20px_rgba(0,0,0,0.2)] relative z-10"
+-                >
+-                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-amber-400/20 blur-3xl rounded-full mix-blend-multiply" />
+-                   <span className="relative block">{currentBadge.icon}</span>
+-                </motion.div>
+-                <h3 className={`text-4xl md:text-5xl font-black ${currentBadge.text} mb-4 relative z-10 tracking-tight leading-tight`}>{currentBadge.title}</h3>
+-                <p className="text-xl md:text-2xl text-slate-500 font-bold relative z-10 leading-snug">{currentBadge.description}</p>
+-                <div className="mt-8 py-3 px-8 bg-slate-900 rounded-full font-bold text-amber-300 tracking-wider text-sm uppercase shadow-lg border border-slate-700 relative z-10">
++                <div className="text-8xl md:text-9xl mb-8 filter drop-shadow-lg animate-bounce">{currentBadge.icon}</div>
++                <h3 className={`text-3xl md:text-5xl font-black ${currentBadge.text} mb-4`}>{currentBadge.title}</h3>
++                <p className="text-xl md:text-2xl text-slate-600 font-bold">{currentBadge.description}</p>
++                <div className="mt-6 py-2 px-6 bg-slate-100 rounded-full font-bold text-slate-500">
+                   {numAnswered} Questions Completed in {currentBadge.contextTopic}!
+                 </div>
+               </motion.div>
+@@ -4561,42 +4292,21 @@
+              <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-2xl mb-12">
+                Earned Badges!
+              </h1>
+-             
+-             <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 w-full max-w-7xl relative z-10 px-4">
+-               {earnedBadges.map((badge, idx) => {
+-                  return (
++             <div className="flex flex-wrap items-center justify-center gap-8 w-full max-w-5xl">
++               {earnedBadges.map((badge, idx) => (
+                   <motion.div
+                     key={idx}
+-                    initial={{ scale: 0.8, opacity: 0, y: 50, rotateX: 20 }}
+-                    animate={{ scale: 1, opacity: 1, y: 0, rotateX: 0 }}
+-                    whileHover={{ scale: 1.05, y: -10 }}
+-                    transition={{ delay: idx * 0.2, type: 'spring', bounce: 0.5, duration: 1 }}
+-                    className="relative group bg-white/95 backdrop-blur-xl rounded-[3rem] p-8 md:p-10 flex flex-col items-center text-center shadow-[0_20px_60px_rgba(0,0,0,0.2)] border-[6px] border-white/50 w-72 md:w-80 overflow-hidden"
++                    initial={{ scale: 0, opacity: 0, y: 50 }}
++                    animate={{ scale: 1, opacity: 1, y: 0 }}
++                    transition={{ delay: idx * 0.4, type: 'spring', bounce: 0.5 }}
++                    className="bg-white rounded-3xl p-8 flex flex-col items-center text-center shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-b-[12px] border-slate-200 w-64 md:w-80"
+                   >
+-                    {/* Animated Shine Effect */}
+-                    <motion.div 
+-                      className="absolute inset-0 -translate-x-[150%] skew-x-[-30deg] bg-gradient-to-r from-transparent via-white/70 to-transparent z-0 group-hover:translate-x-[150%]"
+-                      transition={{ duration: 0.8, ease: "easeInOut" }}
+-                    />
+-                    
+-                    <motion.div 
+-                      animate={{ y: [0, -12, 0], rotate: [-2, 2, -2] }}
+-                      transition={{ duration: 3 + Math.random(), repeat: Infinity, ease: "easeInOut" }}
+-                      className="text-8xl md:text-9xl mb-8 filter drop-shadow-[0_15px_15px_rgba(0,0,0,0.2)] z-10 relative"
+-                    >
+-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-amber-400/20 blur-3xl rounded-full mix-blend-multiply" />
+-                      <span className="relative block transform transition-transform group-hover:scale-110 duration-500">{badge.icon}</span>
+-                    </motion.div>
+-
+-                    <div className="z-10 bg-slate-900 text-amber-300 font-bold uppercase tracking-[0.15em] text-xs px-5 py-2 rounded-full mb-5 shadow-md border border-slate-700/50">
+-                      {badge.player}
+-                    </div>
+-
+-                    <h3 className="z-10 text-3xl font-black text-slate-800 mb-4 tracking-tight leading-tight">{badge.name}</h3>
+-                    
+-                    <p className="z-10 text-sm md:text-base text-slate-500 font-semibold px-2 leading-relaxed">{badge.description}</p>
++                    <div className="text-7xl md:text-8xl mb-6 filter drop-shadow-md">{badge.icon}</div>
++                    <h3 className="text-2xl md:text-3xl font-black text-slate-800 mb-2">{badge.name}</h3>
++                    <p className="text-lg text-slate-500 font-bold mb-4">{badge.player}</p>
++                    <p className="text-sm md:text-base text-slate-600 font-medium">{badge.description}</p>
+                   </motion.div>
+-               )})}
++               ))}
+              </div>
+              
+              <div className="mt-16 flex flex-wrap justify-center gap-6">

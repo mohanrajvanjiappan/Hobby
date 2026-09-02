@@ -1342,9 +1342,14 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             <div className="space-y-4 bg-indigo-50/50 p-6 rounded-2xl border-2 border-indigo-100">
               <div className="flex justify-between items-center">
                 <label className="text-sm font-bold text-indigo-900 uppercase tracking-wider">JSON Files</label>
-                <button type="button" onClick={() => { if (fileInputRef.current) fileInputRef.current.click(); }} className="text-indigo-600 font-bold text-sm bg-white px-4 py-2 rounded-xl hover:bg-indigo-50 border-2 border-indigo-100 shadow-sm transition-all flex items-center gap-2">
-                  <Upload className="w-4 h-4"/> Upload Files
-                </button>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={downloadTemplate} className="text-emerald-600 font-bold text-sm bg-white px-4 py-2 rounded-xl hover:bg-emerald-50 border-2 border-emerald-100 shadow-sm transition-all flex items-center gap-2">
+                    <Download className="w-4 h-4"/> Template
+                  </button>
+                  <button type="button" onClick={() => { if (fileInputRef.current) fileInputRef.current.click(); }} className="text-indigo-600 font-bold text-sm bg-white px-4 py-2 rounded-xl hover:bg-indigo-50 border-2 border-indigo-100 shadow-sm transition-all flex items-center gap-2">
+                    <Upload className="w-4 h-4"/> Upload Files
+                  </button>
+                </div>
               </div>
               <input
                 type="file"

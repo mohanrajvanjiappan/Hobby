@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Quiz } from '../types';
 import { audioSynth } from '../lib/audio';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload, RotateCcw, Music, Gamepad2, Palette, Globe, Plane, Zap } from 'lucide-react';
+import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload, RotateCcw, Music, Gamepad2, Palette, Globe, Plane, Zap, MessageCircle } from 'lucide-react';
 import quizLogo from '../assets/images/quiz_logo_1783447286811.jpg';
 import MapQuestion from './MapQuestion';
 
@@ -12,7 +12,7 @@ interface PresentationProps {
   onExit: () => void;
 }
 
-type Stage = 'intro' | 'player-intro' | 'multiplayer-intro' | 'rules' | 'warmup' | 'countdown' | 'category-selection' | 'rapid-fire-set-selection' | 'question-selection' | 'question' | 'reveal' | 'quote' | 'score' | 'rapid-fire-score' | 'badges' | 'talk' | 'celebrate' | 'outro' | 'video-badges' | 'insight' | 'memory-break-intro' | 'memory-break-memorize' | 'memory-break-question' | 'memory-break-reveal';
+type Stage = 'intro' | 'player-intro' | 'multiplayer-intro' | 'rules' | 'warmup' | 'countdown' | 'category-selection' | 'rapid-fire-set-selection' | 'question-selection' | 'question' | 'reveal' | 'quote' | 'score' | 'rapid-fire-score' | 'badges' | 'talk' | 'celebrate' | 'outro' | 'video-badges' | 'insight' | 'memory-break-intro' | 'memory-break-memorize' | 'memory-break-question' | 'memory-break-reveal' | 'midway-checkin';
 
 const OUTRO_MESSAGES = [
   {
@@ -283,6 +283,7 @@ const getThemeEmojis = (topic: string): string[] => {
 
 export default function Presentation({ quiz, onExit }: PresentationProps) {
   const [stage, setStage] = useState<Stage>('intro');
+  const [shownCheckins, setShownCheckins] = useState<Set<number>>(new Set());
   const [introducingPlayerIndex, setIntroducingPlayerIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
@@ -1416,7 +1417,18 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             const totalQ = quiz.questions.length || 1;
             const maxBadges = Math.min(4, Math.max(1, Math.ceil(totalQ / 5)));
             const badgeInterval = Math.max(5, Math.ceil(totalQ / maxBadges));
-            if (quiz.showBadges !== false && quiz.type !== 'rapid-fire' && numAnswered > 0 && numAnswered % badgeInterval === 0 && numAnswered < totalQ) {
+            
+            const mid1 = Math.floor(totalQ / 3);
+            const mid2 = Math.floor((2 * totalQ) / 3);
+            
+            if (quiz.mode !== 'interactive' && numAnswered > 0 && numAnswered < totalQ && totalQ >= 5 && (numAnswered === mid1 || numAnswered === mid2) && !shownCheckins.has(numAnswered)) {
+              setShownCheckins(prev => {
+                const next = new Set(prev);
+                next.add(numAnswered);
+                return next;
+              });
+              setStage('midway-checkin');
+            } else if (quiz.showBadges !== false && quiz.type !== 'rapid-fire' && numAnswered > 0 && numAnswered % badgeInterval === 0 && numAnswered < totalQ) {
               setStage('video-badges');
             } else {
               if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) { 
@@ -1672,6 +1684,60 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         if (interval) clearInterval(interval);
         window.speechSynthesis.cancel();
       };
+    }
+    
+    if (stage === 'midway-checkin') {
+      audioSynth.playSwoosh();
+      const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && quiz.type !== 'rapid-fire' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
+      const numAnswered = isInteractiveGrid 
+        ? answeredQuestions.size 
+        : currentQuestionIndex + 1;
+        
+      const speechMsg = `How are you doing so far? You have completed ${numAnswered} questions. Comment your score below if you have answered all of them correctly!`;
+      
+      audioSynth.speak(speechMsg, () => {
+        setTimeout(() => {
+           if (quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && quiz.type !== 'rapid-fire' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1)) {
+             if (categories.length > 1) {
+               const categoryQuestions = quiz.questions.map((q, i) => ({q, i})).filter(x => x.q.category === selectedCategory);
+               if (categoryQuestions.length > 0 && categoryQuestions.every(x => answeredQuestions.has(x.i) || x.i === currentQuestionIndex)) {
+                 setStage(quiz.questions.some(q => q.rapidFireSet && q.category === selectedCategory) ? 'rapid-fire-set-selection' : 'category-selection'); rapidFirePlayerIdxRef.current = null;
+               } else {
+                 setStage('question-selection');
+               }
+             } else {
+               setStage('question-selection');
+             }
+           } else {
+             if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) {
+                setHasPlayedMemoryBreak(true);
+                const emojis = getThemeEmojis(quiz.topic || "");
+                const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 8);
+                setMemoryItems(shuffled);
+                setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]);
+                setStage('memory-break-intro');
+             } else {
+               setCurrentQuestionIndex((prev) => prev + 1);
+               if ((currentType as string) === 'rapid-fire') {
+                 const nextQ = quiz.questions[currentQuestionIndex + 1];
+                 if (!nextQ || (nextQ.rapidFireSet ? nextQ.rapidFireSet !== selectedRapidFireSet : nextQ.category !== selectedCategory)) {
+                   setAnsweredQuestions(prevAns => {
+                      const next = new Set(prevAns);
+                      quiz.questions.forEach((q, i) => {
+                          if (q.rapidFireSet ? q.rapidFireSet === selectedRapidFireSet : q.category === selectedCategory) next.add(i);
+                      });
+                      return next;
+                   });
+                   setStage('rapid-fire-score');
+                   return;
+                 }
+               }
+               setStage('question');
+             }
+           }
+        }, 3000);
+      });
+      return () => window.speechSynthesis.cancel();
     }
 
     if (stage === 'video-badges') {
@@ -2104,7 +2170,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   const bgGradient = (quiz.dynamicColors && bgColors.length > 0) ? bgColors[currentQuestionIndex] : "from-cyan-400 via-blue-500 to-indigo-600";
 
   return (
-    <div className={`\${quiz.mode === 'interactive' ? 'presentation-interactive-cursor' : ''} fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans bg-gradient-to-br ${bgGradient} text-white selection:bg-white/30 transition-colors duration-1000`}>
+    <div className={`${quiz.mode === 'interactive' ? 'presentation-interactive-cursor' : ''} fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans bg-gradient-to-br ${bgGradient} text-white selection:bg-white/30 transition-colors duration-1000`}>
       {/* Background Floating Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
         <Star className="absolute top-12 left-[3%] w-12 h-12 text-white animate-pulse" />
@@ -2206,7 +2272,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             ) : (
               <motion.div 
                 initial={{ scale: 0.5, opacity: 0, filter: "blur(20px)", y: 100 }}
-                animate={{ scale: [0.5, 1.1, 1], opacity: 1, filter: "blur(0px)", y: 0 }}
+                animate={{ scale: 1, opacity: 1, filter: "blur(0px)", y: 0 }}
                 transition={{ type: "spring", stiffness: 120, damping: 15, duration: 1.5 }}
                 className="relative mb-12 group"
               >
@@ -2846,13 +2912,6 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             exit={{ opacity: 0 }}
             className="text-center p-8 flex flex-col items-center justify-start h-full z-10 w-full mx-auto relative"
           >
-            {quiz.mode === 'interactive' && (
-              <ParticipantVideoFrames
-                quiz={quiz}
-                playersState={playersState}
-                currentPlayerIndex={currentPlayerIndex}
-              />
-            )}
             {/* Scoreboard */}
             <div className="flex justify-center gap-8 md:gap-16 w-full mb-12">
               {playersState.map((player, idx) => (
@@ -2985,13 +3044,6 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             exit={{ opacity: 0, x: -100, scale: 1.02 }}
             transition={{ type: "spring", stiffness: 200, damping: 25 }}
           >
-            {quiz.mode === 'interactive' && (
-              <ParticipantVideoFrames
-                quiz={quiz}
-                playersState={playersState}
-                currentPlayerIndex={currentPlayerIndex}
-              />
-            )}
             {isInteractiveTimeout && (
               <motion.div
                 initial={{ scale: 0.5, opacity: 0, y: -50 }}
@@ -3224,10 +3276,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 <Star className="w-6 h-6 text-yellow-300 fill-current" />
               </div>
 
-              <div className="flex items-center gap-3 bg-white px-8 py-3 rounded-full shadow-2xl border-4 border-slate-100 text-slate-800">
-                <Clock className="w-8 h-8 text-rose-500 animate-pulse" />
-                <span className="text-3xl font-black tabular-nums">{timeLeft}s</span>
-              </div>
+
             </div>
 
             {/* Question Card */}
@@ -4082,6 +4131,27 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             )}
             </>
             )}
+
+            {/* Modern Animated Bottom Timer */}
+            {stage === 'question' && (
+              <div className="fixed bottom-0 left-0 right-0 z-[60] pointer-events-none pb-8">
+                <div className="flex items-center justify-center max-w-6xl mx-auto gap-4 md:gap-8 px-6">
+                  {/* Timer Circle */}
+                  <div className={`w-20 h-20 md:w-24 md:h-24 shrink-0 rounded-full flex flex-col items-center justify-center border-[4px] shadow-[0_10px_40px_rgba(0,0,0,0.5)] bg-slate-900/90 backdrop-blur-md transition-colors duration-300 ${timeLeft <= 5 ? 'border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.6)] animate-pulse' : 'border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.3)]'}`}>
+                     <span className={`text-3xl md:text-5xl font-black tabular-nums tracking-tighter ${timeLeft <= 5 ? 'text-rose-400' : 'text-white'}`}>{timeLeft}</span>
+                     <span className={`text-[10px] md:text-xs font-bold uppercase tracking-widest ${timeLeft <= 5 ? 'text-rose-400' : 'text-amber-400'}`}>SEC</span>
+                  </div>
+                  
+                  {/* Thicker Timer Bar */}
+                  <div className="h-6 md:h-10 flex-1 bg-black/50 backdrop-blur-sm rounded-full overflow-hidden border-[3px] md:border-4 border-white/10 relative p-1 md:p-1.5 shadow-inner">
+                    <div
+                      className={`h-full rounded-full ${timeLeft <= 5 ? 'bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.8)]' : 'bg-gradient-to-r from-emerald-400 via-amber-400 to-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.6)]'} transition-all ease-linear`}
+                      style={{ width: `${(timeLeft / (question.timeLimit || (currentType === 'word-search' || currentType === 'match-the-following' || currentType === 'detective' ? 30 : (currentType === '5-clues' || isJumbledLetters ? 25 : 15)))) * 100}%`, transitionDuration: '1000ms' }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
           </motion.div>
         )}
@@ -4089,17 +4159,89 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         {stage === 'insight' && question.insight && (
           <motion.div
             key={`insight-${currentQuestionIndex}`}
-            className="relative flex flex-col items-center justify-center p-8 md:p-12 text-center z-10 w-full h-full"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.1 }}
+            className="fixed inset-0 flex flex-col items-center justify-center z-50 p-6 md:p-12 w-full h-full pointer-events-none"
+            initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            animate={{ opacity: 1, backdropFilter: "blur(20px)" }}
+            exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            transition={{ duration: 0.8 }}
           >
-            <div className="bg-emerald-900/40 backdrop-blur-md rounded-3xl p-10 md:p-16 shadow-[0_0_50px_rgba(52,211,153,0.3)] border-4 border-emerald-400 max-w-5xl w-full">
-              <Lightbulb className="w-24 h-24 text-yellow-300 mx-auto mb-8 animate-pulse drop-shadow-[0_0_15px_rgba(253,224,71,0.8)]" />
-              <h2 className="text-4xl md:text-5xl font-black text-yellow-300 leading-tight mb-8 uppercase tracking-widest drop-shadow-md">Did you know?</h2>
-              <p className="text-3xl md:text-5xl font-bold text-white leading-snug drop-shadow-lg">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.3, y: 150, rotateX: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
+              exit={{ opacity: 0, scale: 1.1, y: -50 }}
+              transition={{ type: "spring", stiffness: 100, damping: 15, duration: 1 }}
+              className="bg-gradient-to-br from-emerald-900/90 to-teal-900/90 backdrop-blur-2xl rounded-[3rem] p-12 md:p-20 shadow-[0_0_120px_rgba(52,211,153,0.5)] border-4 border-emerald-400/60 w-[95vw] md:w-[85vw] h-[85vh] flex flex-col items-center justify-center relative overflow-hidden pointer-events-auto"
+            >
+              {/* Animated Background Elements inside the card */}
+              <motion.div 
+                animate={{ rotate: 360 }} 
+                transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                className="absolute -top-[50%] -right-[50%] w-[200%] h-[200%] bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(52,211,153,0.2)_360deg)] pointer-events-none"
+              />
+              <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+
+              <motion.div
+                 initial={{ y: -50, opacity: 0 }}
+                 animate={{ y: 0, opacity: 1 }}
+                 transition={{ type: "spring", delay: 0.3 }}
+                 className="relative z-10 bg-emerald-100/10 p-6 md:p-8 rounded-full border border-emerald-300/30 mb-8 md:mb-12"
+              >
+                 <Lightbulb className="w-24 h-24 md:w-36 md:h-36 text-yellow-300 animate-pulse drop-shadow-[0_0_40px_rgba(253,224,71,1)]" />
+              </motion.div>
+
+              <motion.h2 
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", delay: 0.5 }}
+                className="relative z-10 text-5xl md:text-7xl lg:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-amber-300 to-yellow-500 leading-tight mb-8 md:mb-12 uppercase tracking-[0.1em] md:tracking-[0.2em] drop-shadow-[0_5px_15px_rgba(0,0,0,0.4)] text-center"
+              >
+                Did you know?
+              </motion.h2>
+
+              <motion.p 
+                initial={{ y: 30, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ type: "spring", delay: 0.7 }}
+                className="relative z-10 text-3xl md:text-5xl lg:text-6xl font-extrabold text-white leading-snug drop-shadow-2xl text-center max-w-5xl"
+                style={{ textWrap: 'balance' }}
+              >
                 {question.insight}
+              </motion.p>
+
+              {/* Decorative floating particles */}
+              <motion.div animate={{ y: [-15, 15, -15] }} transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }} className="absolute top-[15%] left-[10%] text-yellow-300/60 text-4xl pointer-events-none">✨</motion.div>
+              <motion.div animate={{ y: [15, -15, 15] }} transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }} className="absolute bottom-[20%] right-[10%] text-emerald-300/60 text-5xl pointer-events-none">🌟</motion.div>
+              <motion.div animate={{ scale: [1, 1.3, 1], rotate: [0, 90, 0] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} className="absolute top-[30%] right-[15%] text-teal-300/50 text-5xl pointer-events-none">✦</motion.div>
+              <motion.div animate={{ scale: [1, 1.4, 1], rotate: [0, -90, 0] }} transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }} className="absolute bottom-[25%] left-[15%] text-yellow-100/50 text-6xl pointer-events-none">✦</motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+        
+        {stage === 'midway-checkin' && (
+          <motion.div
+            key={`midway-checkin-${currentQuestionIndex}`}
+            className="relative flex flex-col items-center justify-center p-8 md:p-12 text-center z-10 w-full h-full"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            transition={{ type: "spring", stiffness: 100, damping: 20 }}
+          >
+            <div className="bg-fuchsia-900/60 backdrop-blur-xl rounded-3xl p-10 md:p-16 shadow-[0_0_80px_rgba(217,70,239,0.5)] border-4 border-fuchsia-400 max-w-5xl w-full flex flex-col items-center gap-6 transform hover:scale-105 transition-transform duration-500">
+              <div className="flex gap-4 mb-4">
+                 <MessageCircle className="w-20 h-20 text-white animate-bounce" />
+                 <ThumbsUp className="w-20 h-20 text-fuchsia-300 transform -rotate-12" />
+              </div>
+              <h2 className="text-5xl md:text-6xl lg:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-300 via-pink-200 to-rose-300 leading-tight mb-6 uppercase tracking-widest drop-shadow-xl text-center">
+                How are you doing so far?
+              </h2>
+              <p className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white leading-snug drop-shadow-lg text-center max-w-4xl mx-auto">
+                Comment your score below!
               </p>
+              <div className="mt-8 bg-white/20 px-8 py-4 rounded-full border-2 border-white/40 shadow-inner">
+                <span className="text-2xl md:text-3xl font-black text-fuchsia-100 uppercase tracking-widest flex items-center gap-3">
+                  <Star className="w-8 h-8 text-yellow-300 fill-current animate-pulse" /> We'd love to know! <Star className="w-8 h-8 text-yellow-300 fill-current animate-pulse" />
+                </span>
+              </div>
             </div>
           </motion.div>
         )}
