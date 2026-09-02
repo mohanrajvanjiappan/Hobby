@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FileText , Gamepad2, MonitorPlay, FileUp } from 'lucide-react';
 import { Quiz } from '../types';
-import { Settings, Play, Loader2, Sparkles, BookOpen, Clock, Mic, Music, Download, Upload, Image as ImageIcon, CheckCircle2, Trash2, Plus, Palette } from 'lucide-react';
+import { Settings, Play, Loader2, Sparkles, BookOpen, Clock, Mic, Music, Download, Upload, Image as ImageIcon, CheckCircle2, Trash2, Plus, Palette, RefreshCw } from 'lucide-react';
 import { motion } from 'motion/react';
 import { audioSynth } from '../lib/audio';
 import { generateWordSearchGrid } from '../lib/wordSearch';
@@ -32,9 +32,50 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
   const [loading, setLoading] = useState(false);
 
   
-  const renderInsightImagesSummary = (quiz: Quiz) => {
+    const renderInsightImagesSummary = (quiz: Quiz, setQuiz: (q: Quiz) => void) => {
     if (!enableInsightImages || !quiz || !quiz.questions || quiz.questions.length === 0) return null;
     const questionsWithImages = quiz.questions.filter(q => q.insightImageUrl);
+    
+    
+    const handleRefreshImage = async (e: React.MouseEvent, qIdx: number, q: any) => {
+      e.stopPropagation();
+      try {
+        // Set a loading state somehow, or just optimistically wait
+        const queryToSearch = q.insightImageSearchQuery || `${quiz.topic ? quiz.topic + ' ' : ''}${q.correctAnswer || q.answer || ''}`.trim();
+        const offset = q._imgOffset || 1;
+        const res = await fetch('/api/refresh-insight-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: queryToSearch, offset })
+        });
+        const data = await res.json();
+        if (data.image) {
+          const updatedQuiz = { ...quiz };
+          updatedQuiz.questions[qIdx].insightImageUrl = data.image;
+          updatedQuiz.questions[qIdx]._imgOffset = data.nextOffset;
+          setQuiz(updatedQuiz);
+        } else {
+           alert("No more images found for this question.");
+        }
+      } catch (err) {
+        console.error("Failed to refresh image:", err);
+      }
+    };
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, qIdx: number) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const updatedQuiz = { ...quiz };
+          updatedQuiz.questions[qIdx].insightImageUrl = event.target.result as string;
+          setQuiz(updatedQuiz);
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+
     if (questionsWithImages.length === 0) return (
       <div className="text-sm text-slate-500 mt-2 bg-slate-100 p-3 rounded-xl text-left border border-slate-200 shadow-sm">
         <div className="font-bold text-slate-600 mb-1 flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Insight Images Summary</div>
@@ -48,20 +89,40 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
           <ImageIcon className="w-4 h-4" /> 
           Insight Images Available ({questionsWithImages.length}/{quiz.questions.length})
         </div>
-        <div className="max-h-32 overflow-y-auto pr-2 custom-scrollbar space-y-1.5">
+        <div className="max-h-48 overflow-y-auto pr-2 custom-scrollbar space-y-1.5">
           {quiz.questions.map((q, idx) => (
              <div key={idx} className={`flex items-start gap-2 ${q.insightImageUrl ? "text-emerald-700" : "text-slate-400 opacity-70"}`}>
                <span className="font-bold min-w-[24px]">Q{idx + 1}:</span>
                <span className="truncate flex-1">{q.question || q.correctAnswer || 'Question'}</span>
-               {q.insightImageUrl ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" /> : <div className="w-4 h-4 shrink-0" />}
+               <div className="flex shrink-0 items-center gap-1">
+                 {q.insightImageUrl ? (
+                   <label className="cursor-pointer group relative block shrink-0" title="Click to upload image">
+                     <img src={q.insightImageUrl} className="w-10 h-10 object-cover rounded shadow-sm border border-emerald-200 group-hover:opacity-70 transition-opacity" alt="Preview" />
+                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageChange(e, idx)} />
+                   </label>
+                 ) : (
+                   <label className="cursor-pointer block shrink-0" title="Click to upload image">
+                     <div className="w-10 h-10 border border-dashed border-slate-300 rounded flex items-center justify-center hover:bg-slate-100 transition-colors">
+                       <ImageIcon className="w-4 h-4 opacity-50" />
+                     </div>
+                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageChange(e, idx)} />
+                   </label>
+                 )}
+                 <button 
+                   type="button" 
+                   onClick={(e) => handleRefreshImage(e, idx, q)} 
+                   className="w-10 h-10 bg-slate-100 hover:bg-indigo-100 text-slate-500 hover:text-indigo-600 rounded flex items-center justify-center transition-colors border border-slate-200 shadow-sm"
+                   title="Fetch another image from web"
+                 >
+                   <RefreshCw className="w-4 h-4" />
+                 </button>
+               </div>
              </div>
           ))}
         </div>
       </div>
     );
   };
-
-
   const enrichQuizInsightsAndStart = async (quizToEnrich: Quiz, mode: 'video' | 'interactive') => {
     setLoading(true);
     try {
@@ -488,11 +549,27 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
           timeLimit: 15
         },
         {
-          question: "Identify this blurred character",
+          question: "Identify this pixelated character",
           imageUrl: "https://upload.wikimedia.org/wikipedia/en/a/a9/MarioPortrait.png",
           options: ["Mario", "Luigi", "Sonic", "Link"],
           correctAnswer: "Mario",
           blurTechnique: "pixelated-blur",
+          timeLimit: 15
+        },
+        {
+          question: "Guess the landmark (Inverted!)",
+          imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Tour_Eiffel_Wikimedia_Commons.jpg/800px-Tour_Eiffel_Wikimedia_Commons.jpg",
+          options: ["Eiffel Tower", "Big Ben", "Statue of Liberty", "Colosseum"],
+          correctAnswer: "Eiffel Tower",
+          blurTechnique: "invert-blur",
+          timeLimit: 15
+        },
+        {
+          question: "What is this zoomed object?",
+          imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Cat03.jpg/1200px-Cat03.jpg",
+          options: ["Cat", "Dog", "Rabbit", "Fox"],
+          correctAnswer: "Cat",
+          blurTechnique: "zoom-blur",
           timeLimit: 15
         }
       ];
@@ -1394,7 +1471,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
             </div>
             <h2 className="text-2xl font-bold text-slate-800">Quiz Ready!</h2>
             <p className="text-slate-600">"{loadedOfflineQuiz.title || loadedOfflineQuiz.topic}" is ready to play.</p>
-            {renderInsightImagesSummary(loadedOfflineQuiz)}
+            {renderInsightImagesSummary(loadedOfflineQuiz, (q) => setLoadedOfflineQuiz(q))}
             
             <div className="space-y-2 text-left mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
               <label className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
@@ -1442,7 +1519,7 @@ export default function Setup({ onQuizGenerated }: SetupProps) {
         ) : pendingInteractiveQuiz ? (
           <div className="p-8 space-y-6">
             <h2 className="text-2xl font-bold text-slate-800 text-center">Interactive Setup</h2>
-            {renderInsightImagesSummary(pendingInteractiveQuiz)}
+            {renderInsightImagesSummary(pendingInteractiveQuiz, (q) => setPendingInteractiveQuiz(q))}
             
             <div className="space-y-4">
               <div className="flex items-center gap-3 py-1 text-left bg-indigo-50/60 p-3 rounded-xl border border-indigo-100">

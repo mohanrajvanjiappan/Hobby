@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Quiz } from '../types';
 import { audioSynth } from '../lib/audio';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Wind, Coffee, Search, Award, Droplets, Activity, Eye, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload, RotateCcw } from 'lucide-react';
+import { Trophy, Award, Medal, Gift, Crown, Star, Clock, Brain, Rocket, Sparkles, Lightbulb, Cat, Dumbbell, Bot, Computer, Dog, GraduationCap, Play, Pause, Camera, ThumbsUp, Bell, Youtube, Share2, Download, FileJson, Image as ImageIcon, Upload, RotateCcw } from 'lucide-react';
 import quizLogo from '../assets/images/quiz_logo_1783447286811.jpg';
 import MapQuestion from './MapQuestion';
 
@@ -107,8 +107,8 @@ const ParticipantVideoFrames: React.FC<ParticipantVideoFramesProps> = ({
       setActiveCameras((prev) => ({ ...prev, [id]: false }));
     } else {
       try {
-        // No real camera access
-        // setStreams not populated with real stream
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        setStreams((prev) => ({ ...prev, [id]: stream }));
         setActiveCameras((prev) => ({ ...prev, [id]: true }));
       } catch (err) {
         console.warn('Unable to access camera', err);
@@ -170,7 +170,7 @@ const ParticipantVideoFrames: React.FC<ParticipantVideoFramesProps> = ({
             {/* Outside Border Info Bar (Player Name, Turn, Score, Camera) */}
             <div className="flex items-center justify-between gap-2 px-2.5 py-1 bg-slate-900/95 backdrop-blur-md rounded-xl border border-white/20 text-white shadow-lg w-full">
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="font-black tracking-tight text-white text-xs md:text-sm truncate max-w-[100px]">
+                <span className="font-extrabold text-white text-xs md:text-sm truncate max-w-[100px]">
                   {player.name || `Player ${idx + 1}`}
                 </span>
                 {isCurrent && (
@@ -201,7 +201,7 @@ const ParticipantVideoFrames: React.FC<ParticipantVideoFramesProps> = ({
 
             {quiz.showBadges !== false && player.badges && player.badges.length > 0 && (
               <div className="flex items-center justify-between gap-1 px-2.5 py-1 bg-amber-400/20 backdrop-blur-md rounded-xl border border-amber-300/40 text-xs w-full overflow-hidden shadow-sm">
-                <span className="text-[10px] font-black tracking-tight text-amber-200 uppercase tracking-wider shrink-0">
+                <span className="text-[10px] font-extrabold text-amber-200 uppercase tracking-wider shrink-0">
                   Badges
                 </span>
                 <div className="flex items-center gap-1 overflow-hidden">
@@ -268,43 +268,6 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   const [earnedBadges, setEarnedBadges] = useState<{player: string, name: string, icon: string, description: string}[]>([]);
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
   const [interactiveOptionClicked, setInteractiveOptionClicked] = useState<string | null>(null);
-  
-  type BreakMode = 'menu' | 'memory-intro' | 'memory-memorize' | 'memory-question' | 'memory-reveal' | 'riddle' | 'word-search' | 'hydration' | 'stretch' | 'eye-rest' | 'mindful-breathing' | null;
-  const [breakMode, setBreakMode] = useState<BreakMode>(null);
-  const breakRiddles = [
-    { q: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?", a: "An Echo" },
-    { q: "You measure my life in hours and I serve you by expiring. I'm quick when I'm thin and slow when I'm fat. The wind is my enemy.", a: "A Candle" },
-    { q: "I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?", a: "A Map" },
-    { q: "What is seen in the middle of March and April that can't be seen at the beginning or end of either month?", a: "The letter 'R'" },
-    { q: "You see a boat filled with people. It has not sunk, but when you look again you don’t see a single person on the boat. Why?", a: "All the people were married" }
-  ];
-  const [breakRiddleIndex, setBreakRiddleIndex] = useState(0);
-  const [showBreakRiddleAnswer, setShowBreakRiddleAnswer] = useState(false);
-  const [breakWordSearchGrid, setBreakWordSearchGrid] = useState<{char:string, found:boolean}[][]>([]);
-  const [breakWordSearchWords, setBreakWordSearchWords] = useState<{word:string, found:boolean}[]>([]);
-  const [breakWsStartNode, setBreakWsStartNode] = useState<{r:number, c:number} | null>(null);
-  const [breakWsCurrentSelection, setBreakWsCurrentSelection] = useState<{r:number, c:number}[]>([]);
-  const breakTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  const [breakTimeLeft, setBreakTimeLeft] = useState(0);
-  const [breakMemoryTarget, setBreakMemoryTarget] = useState('');
-  const [breakMemoryItems, setBreakMemoryItems] = useState<string[]>([]);
-  const [breakElapsedSeconds, setBreakElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (breakMode) {
-      interval = setInterval(() => {
-        setBreakElapsedSeconds(prev => prev + 1);
-      }, 1000);
-    } else {
-      setBreakElapsedSeconds(0);
-    }
-    return () => clearInterval(interval);
-  }, [breakMode]);
-
-  const formatBreakTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
-
-
   const [usedFiftyFifty, setUsedFiftyFifty] = useState<Record<string, boolean>>({});
   const [eliminatedOptions, setEliminatedOptions] = useState<number[]>([]);
   const [jumbledInput, setJumbledInput] = useState<string>("");
@@ -563,7 +526,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   const currentType = question?.type || quiz.type;
 
   const isImageQuestion = Boolean(
-    currentType === 'identify-image' || currentType === 'blurred-image' || 
+    currentType === 'identify-image' || 
     currentType?.toLowerCase() === 'identify' ||
     question?.category?.toLowerCase().includes('identify') ||
     question?.category?.toLowerCase().includes('image') ||
@@ -933,7 +896,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   } else {
     setStage('score');
   }
-}
+};
                 }
                 return 0;
               }
@@ -969,7 +932,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   } else {
     setStage('score');
   }
-}
+};
                 }
                 return 0;
               }
@@ -1090,7 +1053,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         }, 1000);
       } else if (quiz.type === 'combat-mode') {
         audioSynth.startCombatMusic();
-        setTimeLeft(question.timeLimit || 15);
+        setTimeLeft(question.timeLimit);
         
         timerRef.current = setInterval(() => {
           if (isPausedRef.current) return;
@@ -1172,7 +1135,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         }
         audioSynth.speak(textToSpeak || 'Identify the image');
         if (quiz.type !== 'rapid-fire') {
-          setTimeLeft(question.timeLimit || 15);
+          setTimeLeft(question.timeLimit);
         
           timerRef.current = setInterval(() => {
             if (isPausedRef.current) return;
@@ -1281,7 +1244,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   } else {
     setStage('score');
   }
-}
+};
           } else {
             const totalQ = quiz.questions.length || 1;
             const maxBadges = Math.min(4, Math.max(1, Math.ceil(totalQ / 5)));
@@ -1292,8 +1255,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             } else {
               if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) {
                  setHasPlayedMemoryBreak(true);
-                 const emojis = (quiz.themeMemoryBreak && quiz.memoryBreakEmojis && quiz.memoryBreakEmojis.length >= 10) ? quiz.memoryBreakEmojis : ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈','🍓','🍦','🍩','🐧','🦋','🐢','🦖','🐙','🐳','🐬','🦄','🌈','☀️','🌙','⭐','🎨','🎮','🎲','🎯','🏆','🏅','🎭','🎪','🎢','🎡','🚁','✈️','⛵','🚂','🚜','🚒','🚓','🚑','🚕','🚌','🏰','⛺','🏠','🌲','🌴','🌵','🍁','🍄','🍇','🍌','🍒','🍑','🍍','🥑','🥕','🌽','🥦','🥨','🧀','🥩','🍗','🌮','🌯','🥗','🍿','🍫','🍬','🍭','🍼','☕','🍵','🥤','🍹','🧊','⚽','⚾','🥎','🎾','🏐','🏉','🎱','🪀','🪁','🔮','🪄','🧿','💎','👑','🔔','🎵','🎶'];
-                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 10);
+                 const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈'];
+                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, 10);
                  setMemoryItems(shuffled);
                  setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]);
                  setStage('memory-break-intro');
@@ -1389,7 +1352,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   } else {
     setStage('score');
   }
-}
+};
           } else {
             const totalQ = quiz.questions.length || 1;
             const maxBadges = Math.min(4, Math.max(1, Math.ceil(totalQ / 5)));
@@ -1399,8 +1362,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             } else {
               if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) { 
                  setHasPlayedMemoryBreak(true); 
-                 const emojis = (quiz.themeMemoryBreak && quiz.memoryBreakEmojis && quiz.memoryBreakEmojis.length >= 10) ? quiz.memoryBreakEmojis : ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈','🍓','🍦','🍩','🐧','🦋','🐢','🦖','🐙','🐳','🐬','🦄','🌈','☀️','🌙','⭐','🎨','🎮','🎲','🎯','🏆','🏅','🎭','🎪','🎢','🎡','🚁','✈️','⛵','🚂','🚜','🚒','🚓','🚑','🚕','🚌','🏰','⛺','🏠','🌲','🌴','🌵','🍁','🍄','🍇','🍌','🍒','🍑','🍍','🥑','🥕','🌽','🥦','🥨','🧀','🥩','🍗','🌮','🌯','🥗','🍿','🍫','🍬','🍭','🍼','☕','🍵','🥤','🍹','🧊','⚽','⚾','🥎','🎾','🏐','🏉','🎱','🪀','🪁','🔮','🪄','🧿','💎','👑','🔔','🎵','🎶']; 
-                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 10); 
+                 const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈']; 
+                 const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, 10); 
                  setMemoryItems(shuffled); 
                  setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]); 
                  setStage('memory-break-intro');
@@ -1527,7 +1490,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
       audioSynth.playCorrect();
       
       let t: NodeJS.Timeout;
-      audioSynth.speak(`Here it is! Did you find it correctly? Great! Let's get back to the quiz.`, () => {
+      audioSynth.speak(`Here it is! Let's get back to the quiz.`, () => {
         t = setTimeout(() => {
           audioSynth.playSwoosh();
           const isInteractiveGrid = quiz.mode === 'interactive' && quiz.type !== 'combat-mode' && quiz.type !== 'rapid-fire' && (quiz.isMultiplayer && (quiz.players?.length || 1) > 1);
@@ -1687,8 +1650,8 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               } else {
                 if (quiz.enableMemoryBreak && !hasPlayedMemoryBreak && quiz.questions.length > 1 && numAnswered >= Math.floor(quiz.questions.length / 2)) {
                    setHasPlayedMemoryBreak(true);
-                   const emojis = (quiz.themeMemoryBreak && quiz.memoryBreakEmojis && quiz.memoryBreakEmojis.length >= 10) ? quiz.memoryBreakEmojis : ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈','🍓','🍦','🍩','🐧','🦋','🐢','🦖','🐙','🐳','🐬','🦄','🌈','☀️','🌙','⭐','🎨','🎮','🎲','🎯','🏆','🏅','🎭','🎪','🎢','🎡','🚁','✈️','⛵','🚂','🚜','🚒','🚓','🚑','🚕','🚌','🏰','⛺','🏠','🌲','🌴','🌵','🍁','🍄','🍇','🍌','🍒','🍑','🍍','🥑','🥕','🌽','🥦','🥨','🧀','🥩','🍗','🌮','🌯','🥗','🍿','🍫','🍬','🍭','🍼','☕','🍵','🥤','🍹','🧊','⚽','⚾','🥎','🎾','🏐','🏉','🎱','🪀','🪁','🔮','🪄','🧿','💎','👑','🔔','🎵','🎶'];
-                   const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, quiz.memoryBreakImageCount || 10);
+                   const emojis = ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈'];
+                   const shuffled = emojis.sort(() => 0.5 - Math.random()).slice(0, 10);
                    setMemoryItems(shuffled);
                    setMemoryTarget(shuffled[Math.floor(Math.random() * shuffled.length)]);
                    setStage('memory-break-intro');
@@ -2053,21 +2016,34 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
     }
   };
 
-  let bgClasses = "bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600";
-  if (quiz.dynamicColors && quiz.mode === 'video') {
-    const colorThemes = [
-      "bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600",
-      "bg-gradient-to-br from-emerald-400 via-green-500 to-teal-600",
-      "bg-gradient-to-br from-amber-400 via-orange-500 to-rose-600",
-      "bg-gradient-to-br from-rose-400 via-red-500 to-pink-600",
-      "bg-gradient-to-br from-fuchsia-400 via-purple-500 to-indigo-600"
-    ];
-    const themeIndex = Math.floor(currentQuestionIndex / 2) % colorThemes.length;
-    bgClasses = colorThemes[themeIndex];
-  }
+  const getBlurStyle = () => {
+    if (stage === 'reveal' || stage === 'quote' || stage === 'score' || stage === 'celebrate' || stage === 'badges' || stage === 'video-badges' || stage === 'outro') {
+      return {};
+    }
+    
+    const question = quiz.questions[currentQuestionIndex];
+    const isBlurQuiz = quiz.type === 'blurred-image' || quiz.type === 'identify-image'; 
+    const technique = question?.blurTechnique || (quiz.type === 'blurred-image' ? 'normal-blur' : null);
+    
+    if (!technique) return {};
+
+    switch (technique) {
+      case 'heavy-blur': return { filter: 'blur(35px)' };
+      case 'normal-blur': return { filter: 'blur(20px)' };
+      case 'light-blur': return { filter: 'blur(8px)' };
+      case 'grayscale-blur': return { filter: 'blur(15px) grayscale(100%)' };
+      case 'invert-blur': return { filter: 'blur(15px) invert(100%)' };
+      case 'sepia-blur': return { filter: 'blur(15px) sepia(100%)' };
+      case 'hue-rotate-blur': return { filter: 'blur(15px) hue-rotate(90deg)' };
+      case 'high-contrast-blur': return { filter: 'blur(12px) contrast(200%) saturate(150%)' };
+      case 'pixelated-blur': return { filter: 'url(#pixelate)' };
+      case 'zoom-blur': return { filter: 'url(#zoom-blur)' };
+      default: return { filter: 'blur(15px)' };
+    }
+  };
 
   return (
-    <div className={`${quiz.mode === 'interactive' ? 'presentation-interactive-cursor' : ''} fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans ${bgClasses} text-white selection:bg-white/30 transition-colors duration-1000`}>
+    <div className={`\${quiz.mode === 'interactive' ? 'presentation-interactive-cursor' : ''} fixed inset-0 w-full h-full flex flex-col items-center overflow-hidden font-sans bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white selection:bg-white/30`}>
 
       {/* Background Floating Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
@@ -2089,356 +2065,6 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
         className="absolute top-0 left-0 w-16 h-16 opacity-0 z-50 cursor-default"
         title="Hidden Exit Button"
       />
-      
-      {quiz.mode === 'interactive' && quiz.players && quiz.players.length > 1 && !breakMode && stage !== 'outro' && (
-         <button onClick={() => { setIsPaused(true); setBreakMode('menu'); }} className="absolute top-6 left-20 z-50 px-4 py-2 bg-white/20 backdrop-blur-md rounded-xl text-white font-bold border-2 border-white/40 hover:bg-white/30 transition-all flex items-center gap-2 shadow-lg hover:scale-105 active:scale-95">
-            <Coffee className="w-5 h-5" /> Break
-         </button>
-      )}
-
-      {breakMode && (
-        <div className="absolute inset-0 z-[100] bg-slate-900/95 backdrop-blur-xl flex flex-col items-center justify-center p-8 overflow-y-auto">
-           
-           <div className="absolute top-6 left-6 flex items-center gap-3 bg-black/40 px-5 py-3 rounded-2xl backdrop-blur-md text-white font-mono text-3xl font-black border-2 border-white/20 shadow-lg">
-             <Clock className="w-8 h-8 text-amber-400 animate-pulse" />
-             {formatBreakTime(breakElapsedSeconds)}
-           </div>
-           {breakMode === 'menu' && (
-             <div className="w-full max-w-2xl bg-white/10 p-8 rounded-3xl border-4 border-white/20 shadow-2xl text-center">
-                <h2 className="text-5xl font-black text-white mb-8 drop-shadow-lg flex items-center justify-center gap-4">
-                  <Coffee className="w-12 h-12 text-amber-400" /> Quiz Break
-                </h2>
-                <div className="flex flex-col gap-4">
-                  <button onClick={() => {
-                      const allEmoji = (quiz.themeMemoryBreak && quiz.memoryBreakEmojis && quiz.memoryBreakEmojis.length >= 10) ? quiz.memoryBreakEmojis : ['🍎','🚗','🐶','🚀','🎸','🏀','🍔','🚲','📚','⌚','🧸','🌻','🎈','📷','🧩','🍉','🛸','🐱','🎷','🏈','🍓','🍦','🍩','🐧','🦋','🐢','🦖','🐙','🐳','🐬','🦄','🌈','☀️','🌙','⭐','🎨','🎮','🎲','🎯','🏆','🏅','🎭','🎪','🎢','🎡','🚁','✈️','⛵','🚂','🚜','🚒','🚓','🚑','🚕','🚌','🏰','⛺','🏠','🌲','🌴','🌵','🍁','🍄','🍇','🍌','🍒','🍑','🍍','🥑','🥕','🌽','🥦','🥨','🧀','🥩','🍗','🌮','🌯','🥗','🍿','🍫','🍬','🍭','🍼','☕','🍵','🥤','🍹','🧊','⚽','⚾','🥎','🎾','🏐','🏉','🎱','🪀','🪁','🔮','🪄','🧿','💎','👑','🔔','🎵','🎶'];
-                      const shuffled = [...allEmoji].sort(() => 0.5 - Math.random());
-                      const selected = shuffled.slice(0, quiz.memoryBreakImageCount || 10);
-                      setBreakMemoryItems(selected);
-                      setBreakMemoryTarget(selected[Math.floor(Math.random() * selected.length)]);
-                      setBreakMode('memory-intro');
-                      audioSynth.speak("Time for a quick memory break! Pay close attention to these objects.");
-                      setTimeout(() => {
-                         setBreakMode('memory-memorize');
-                         setBreakTimeLeft(10);
-                         if (breakTimerRef.current) clearInterval(breakTimerRef.current);
-                         breakTimerRef.current = setInterval(() => {
-                            setBreakTimeLeft(prev => {
-                               if (prev <= 1) {
-                                  clearInterval(breakTimerRef.current!);
-                                  setBreakMode('memory-question');
-                                  audioSynth.speak("Where was the " + breakMemoryTarget + "?");
-                                  setBreakTimeLeft(10);
-                                  breakTimerRef.current = setInterval(() => {
-                                      setBreakTimeLeft(p => {
-                                          if (p <= 1) {
-                                              clearInterval(breakTimerRef.current!);
-                                              setBreakMode('memory-reveal');
-                                              audioSynth.playSwoosh();
-                                              setTimeout(() => setBreakMode('menu'), 4000);
-                                              return 0;
-                                          }
-                                          return p - 1;
-                                      });
-                                  }, 1000);
-                                  return 0;
-                               }
-                               return prev - 1;
-                            });
-                         }, 1000);
-                      }, 4000);
-                  }} className="w-full py-4 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-bold text-2xl transition-all shadow-lg flex items-center justify-center gap-3">
-                    <Brain className="w-8 h-8" /> Memory Break
-                  </button>
-                  <button onClick={() => {
-                      setBreakRiddleIndex(Math.floor(Math.random() * breakRiddles.length));
-                      setShowBreakRiddleAnswer(false);
-                      setBreakMode('riddle');
-                  }} className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-2xl transition-all shadow-lg flex items-center justify-center gap-3">
-                    <Lightbulb className="w-8 h-8" /> Riddle Break
-                  </button>
-                  <button onClick={() => {
-                      // Generate a simple 8x8 word search
-                      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-                      const allWordsPool = ["REACT", "QUIZ", "BREAK", "FUN", "PLAY", "GAME", "CODE", "TIME", "FAST", "SMART", "NERD", "GEEK", "COOL", "WINS", "LAUGH"];
-                      const words = [...allWordsPool].sort(() => 0.5 - Math.random()).slice(0, 5);
-                      const grid = Array(8).fill(null).map(() => Array(8).fill(null).map(() => ({char: letters[Math.floor(Math.random()*26)], found: false})));
-                      const placedWords: {word:string, found:boolean}[] = [];
-                      for (const word of words) {
-                          placedWords.push({word, found: false});
-                          // Simplified placement: just horizontal or vertical randomly for this break
-                          let placed = false;
-                          for(let attempt=0; attempt<50 && !placed; attempt++) {
-                              const isHoriz = Math.random() < 0.5;
-                              const r = Math.floor(Math.random() * 8);
-                              const c = Math.floor(Math.random() * 8);
-                              if (isHoriz && c + word.length <= 8) {
-                                  grid[r].splice(c, word.length, ...word.split('').map(char => ({char, found: false})));
-                                  placed = true;
-                              } else if (!isHoriz && r + word.length <= 8) {
-                                  for (let i=0; i<word.length; i++) grid[r+i][c] = {char: word[i], found: false};
-                                  placed = true;
-                              }
-                          }
-                      }
-                      setBreakWordSearchGrid(grid);
-                      setBreakWordSearchWords(placedWords);
-                      setBreakMode('word-search');
-                  }} className="w-full py-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-2xl transition-all shadow-lg flex items-center justify-center gap-3">
-                    <Search className="w-8 h-8" /> Word Search Break
-                  </button>
-                  <button onClick={() => {
-                      setBreakMode('hydration');
-                      audioSynth.speak("Hydration check! Make sure to drink enough water.");
-                  }} className="w-full py-4 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-2xl transition-all shadow-lg flex items-center justify-center gap-3">
-                    <Droplets className="w-8 h-8" /> Hydration Check
-                  </button>
-                  <button onClick={() => {
-                      setBreakMode('stretch');
-                      audioSynth.speak("Time for a gentle stretch! Let's get up and move around a bit.");
-                  }} className="w-full py-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-2xl transition-all shadow-lg flex items-center justify-center gap-3">
-                    <Activity className="w-8 h-8" /> Gentle Stretching
-                  </button>
-                  <button onClick={() => {
-                      setBreakMode('eye-rest');
-                      audioSynth.speak("The 20 20 20 rule. Look at an object 20 feet away for 20 seconds to rest your eye muscles.");
-                  }} className="w-full py-4 rounded-xl bg-fuchsia-500 hover:bg-fuchsia-600 text-white font-bold text-2xl transition-all shadow-lg flex items-center justify-center gap-3">
-                    <Eye className="w-8 h-8" /> 20-20-20 Eye Rest
-                  </button>
-                  <button onClick={() => {
-                      setBreakMode('mindful-breathing');
-                      audioSynth.speak("Time for some mindful breathing. Take a deep breath in... and out...");
-                  }} className="w-full py-4 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-bold text-2xl transition-all shadow-lg flex items-center justify-center gap-3">
-                    <Wind className="w-8 h-8" /> Mindful Breathing
-                  </button>
-                </div>
-                <button onClick={() => { setBreakMode(null); setIsPaused(false); }} className="mt-8 px-8 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xl transition-all border-2 border-slate-500">
-                  Resume Quiz
-                </button>
-             </div>
-           )}
-
-           {breakMode === 'riddle' && (
-             <div className="w-full max-w-4xl bg-white/10 p-12 rounded-[3rem] border-4 border-white/20 shadow-2xl text-center">
-                <Lightbulb className="w-20 h-20 text-yellow-400 mx-auto mb-8 animate-pulse" />
-                <h2 className="text-4xl md:text-5xl font-black text-white mb-12 leading-tight">
-                  {breakRiddles[breakRiddleIndex].q}
-                </h2>
-                {!showBreakRiddleAnswer ? (
-                  <button onClick={() => setShowBreakRiddleAnswer(true)} className="px-10 py-5 rounded-2xl bg-indigo-500 hover:bg-indigo-600 text-white font-bold text-3xl transition-all shadow-xl hover:scale-105 active:scale-95">
-                    Reveal Answer
-                  </button>
-                ) : (
-                  <div className="mt-8 animate-in zoom-in duration-300">
-                    <p className="text-6xl font-black text-emerald-400 drop-shadow-lg mb-10">{breakRiddles[breakRiddleIndex].a}</p>
-                    <button onClick={() => setBreakMode('menu')} className="px-8 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xl transition-all">
-                      Back to Menu
-                    </button>
-                  </div>
-                )}
-             </div>
-           )}
-
-           {breakMode === 'hydration' && (
-             <div className="w-full max-w-4xl bg-white/10 p-12 rounded-[3rem] border-4 border-cyan-400/50 shadow-2xl text-center">
-                <Droplets className="w-24 h-24 text-cyan-400 mx-auto mb-8 animate-bounce" />
-                <h2 className="text-5xl md:text-6xl font-black text-white mb-8 leading-tight">
-                  Hydration Check!
-                </h2>
-                <p className="text-3xl text-cyan-100 mb-12">
-                  Take a moment to drink some water. Staying hydrated keeps your brain sharp and helps you focus!
-                </p>
-                <button onClick={() => setBreakMode('menu')} className="px-8 py-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-2xl transition-all">
-                  Back to Menu
-                </button>
-             </div>
-           )}
-
-           {breakMode === 'stretch' && (
-             <div className="w-full max-w-4xl bg-white/10 p-12 rounded-[3rem] border-4 border-orange-400/50 shadow-2xl text-center">
-                <Activity className="w-24 h-24 text-orange-400 mx-auto mb-8 animate-pulse" />
-                <h2 className="text-5xl md:text-6xl font-black text-white mb-8 leading-tight">
-                  Gentle Stretching
-                </h2>
-                <p className="text-3xl text-orange-100 mb-12">
-                  Stand up, stretch your arms, roll your shoulders, and loosen up! A quick physical break resets your energy.
-                </p>
-                <button onClick={() => setBreakMode('menu')} className="px-8 py-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-2xl transition-all">
-                  Back to Menu
-                </button>
-             </div>
-           )}
-
-           {breakMode === 'mindful-breathing' && (
-             <div className="w-full max-w-4xl bg-white/10 p-12 rounded-[3rem] border-4 border-teal-400/50 shadow-2xl text-center">
-                <Wind className="w-24 h-24 text-teal-400 mx-auto mb-8 animate-pulse" />
-                <h2 className="text-5xl md:text-6xl font-black text-white mb-8 leading-tight">
-                  Mindful Breathing
-                </h2>
-                <p className="text-3xl text-teal-100 mb-12">
-                  Take a slow, deep breath in through your nose... and exhale gently through your mouth.
-                </p>
-                <div className="mx-auto w-32 h-32 rounded-full bg-teal-400/30 border-4 border-teal-300 animate-ping mb-12" style={{ animationDuration: '4s' }}></div>
-                <button onClick={() => setBreakMode('menu')} className="px-8 py-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-2xl transition-all">
-                  Back to Menu
-                </button>
-             </div>
-           )}
-
-           {breakMode === 'eye-rest' && (
-             <div className="w-full max-w-4xl bg-white/10 p-12 rounded-[3rem] border-4 border-fuchsia-400/50 shadow-2xl text-center">
-                <Eye className="w-24 h-24 text-fuchsia-400 mx-auto mb-8 animate-pulse" />
-                <h2 className="text-5xl md:text-6xl font-black text-white mb-8 leading-tight">
-                  The 20-20-20 Rule
-                </h2>
-                <p className="text-3xl text-fuchsia-100 mb-12">
-                  Look at an object at least <strong>20 feet</strong> away for <strong>20 seconds</strong>. This helps rest your eye muscles and prevents screen fatigue!
-                </p>
-                <button onClick={() => setBreakMode('menu')} className="px-8 py-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-2xl transition-all">
-                  Back to Menu
-                </button>
-             </div>
-           )}
-
-           {breakMode === 'word-search' && (
-             <div className="w-full max-w-5xl bg-white/10 p-8 rounded-[3rem] border-4 border-white/20 shadow-2xl flex flex-col md:flex-row gap-8 items-center justify-center">
-                <div className="flex-1">
-                  <h2 className="text-3xl font-black text-white mb-6 text-center">Find these words!</h2>
-                  <div className="flex flex-wrap justify-center gap-3">
-                    {breakWordSearchWords.map((w, idx) => (
-                      <span key={idx} className={`px-4 py-2 rounded-lg font-bold text-xl ${w.found ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
-                        {w.word}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="mt-8 text-center">
-                    <button onClick={() => setBreakMode('menu')} className="px-6 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-lg transition-all">
-                      Back to Menu
-                    </button>
-                  </div>
-                </div>
-                <div className="flex-shrink-0 grid grid-cols-8 gap-1 p-2 bg-slate-800 rounded-2xl" onMouseLeave={() => setBreakWsCurrentSelection([])}>
-                  {breakWordSearchGrid.map((row, r) => (
-                    row.map((cell, c) => {
-                      const isSelected = breakWsCurrentSelection.some(pos => pos.r === r && pos.c === c);
-                      return (
-                        <div 
-                          key={`${r}-${c}`}
-                          onMouseDown={(e) => { e.preventDefault(); setBreakWsStartNode({r, c}); setBreakWsCurrentSelection([{r, c}]); }}
-                          onMouseEnter={() => {
-                            if (breakWsStartNode) {
-                               // basic horiz/vert line logic
-                               const sel = [];
-                               if (r === breakWsStartNode.r) {
-                                  const min = Math.min(c, breakWsStartNode.c);
-                                  const max = Math.max(c, breakWsStartNode.c);
-                                  for(let i=min; i<=max; i++) sel.push({r, c: i});
-                               } else if (c === breakWsStartNode.c) {
-                                  const min = Math.min(r, breakWsStartNode.r);
-                                  const max = Math.max(r, breakWsStartNode.r);
-                                  for(let i=min; i<=max; i++) sel.push({r: i, c});
-                               }
-                               if (sel.length > 0) setBreakWsCurrentSelection(sel);
-                            }
-                          }}
-                          onMouseUp={() => {
-                            if (breakWsCurrentSelection.length > 0) {
-                              const wordStr = breakWsCurrentSelection.map(pos => breakWordSearchGrid[pos.r][pos.c].char).join('');
-                              const wordStrRev = wordStr.split('').reverse().join('');
-                              const wordIndex = breakWordSearchWords.findIndex(w => (w.word === wordStr || w.word === wordStrRev) && !w.found);
-                              if (wordIndex !== -1) {
-                                audioSynth.playCorrect();
-                                setBreakWordSearchWords(prev => {
-                                   const next = [...prev];
-                                   next[wordIndex].found = true;
-                                   return next;
-                                });
-                                setBreakWordSearchGrid(prev => {
-                                   const next = [...prev];
-                                   breakWsCurrentSelection.forEach(pos => {
-                                      next[pos.r][pos.c].found = true;
-                                   });
-                                   return next;
-                                });
-                              }
-                            }
-                            setBreakWsStartNode(null);
-                            setBreakWsCurrentSelection([]);
-                          }}
-                          className={`w-10 h-10 md:w-14 md:h-14 flex items-center justify-center text-2xl font-black rounded-lg cursor-pointer select-none transition-all ${cell.found ? 'bg-emerald-500 text-white scale-95 shadow-inner' : isSelected ? 'bg-indigo-500 text-white scale-110' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
-                        >
-                          {cell.char}
-                        </div>
-                      )
-                    })
-                  ))}
-                </div>
-             </div>
-           )}
-
-           {(breakMode === 'memory-intro' || breakMode === 'memory-memorize' || breakMode === 'memory-question' || breakMode === 'memory-reveal') && (
-              <div className="w-[80vw] h-[80vh] max-w-none flex flex-col items-center justify-center">
-                {breakMode === 'memory-intro' && (
-                  <div className="text-center">
-                    <div className="text-9xl mb-8 animate-bounce drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]">🧩</div>
-                    <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-lg mb-6 tracking-wider">Memory Break!</h1>
-                    <p className="text-2xl md:text-4xl font-bold text-indigo-200">How many of these objects can you remember?</p>
-                  </div>
-                )}
-                {breakMode === 'memory-question' && (
-                  <h2 className="text-4xl md:text-6xl font-black text-white drop-shadow-lg mb-8">
-                    Where was the <span className="text-yellow-300 text-6xl md:text-8xl inline-block mx-2 drop-shadow-[0_0_15px_rgba(253,224,71,0.8)] animate-pulse">{breakMemoryTarget}</span> ?
-                  </h2>
-                )}
-                {breakMode === 'memory-memorize' && (
-                  <>
-                    <div className="absolute top-8 right-8 text-6xl font-black text-white bg-black/40 px-6 py-4 rounded-3xl backdrop-blur-md">
-                      {breakTimeLeft}
-                    </div>
-                    <h2 className="text-4xl md:text-5xl font-black text-white drop-shadow-lg mb-8 uppercase tracking-widest">
-                      Take a close look at these objects!
-                    </h2>
-                  </>
-                )}
-                {breakMode === 'memory-reveal' && (
-                  <h2 className="text-4xl md:text-6xl font-black text-emerald-400 drop-shadow-lg mb-8 uppercase tracking-widest">
-                    There it is!
-                  </h2>
-                )}
-                
-                {breakMode !== 'memory-intro' && (
-                  <div className="grid grid-cols-5 grid-rows-2 gap-6 md:gap-8 w-full flex-1 min-h-0">
-                    {breakMemoryItems.map((item, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => {
-                          if (breakMode === 'memory-question') {
-                            if (item === breakMemoryTarget) {
-                              if (breakTimerRef.current) clearInterval(breakTimerRef.current);
-                              setBreakMode('memory-reveal');
-                              audioSynth.playSwoosh();
-                              setTimeout(() => setBreakMode('menu'), 4000);
-                            } else {
-                              audioSynth.playWrong();
-                            }
-                          }
-                        }}
-                        className={`bg-white/10 backdrop-blur-md border-4 border-white/20 rounded-[2.5rem] w-full h-full flex items-center justify-center text-[6rem] md:text-[8rem] lg:text-[10rem] shadow-2xl relative ${breakMode === 'memory-question' ? 'cursor-pointer hover:bg-white/20 hover:scale-105 active:scale-95 transition-all' : ''}`}
-                      >
-                        <div className="absolute top-2 right-4 text-2xl md:text-3xl font-black text-white/50">{idx + 1}</div>
-                        {(breakMode === 'memory-memorize' || breakMode === 'memory-reveal') ? (
-                          <span className={`transition-all ${breakMode === 'memory-reveal' && item === breakMemoryTarget ? 'scale-125 animate-bounce drop-shadow-[0_0_50px_rgba(52,211,153,1)] z-50' : breakMode === 'memory-reveal' ? 'opacity-20 blur-sm' : ''}`}>{item}</span>
-                        ) : (
-                          <span className="text-white/20">?</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-           )}
-        </div>
-      )}
-
       
       {quiz.mode === 'interactive' && showPauseButton && (
         <button
@@ -2732,7 +2358,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 {player.topic && (
                   <div className="mt-2 px-5 py-1.5 bg-indigo-500/30 border border-indigo-400/40 rounded-full text-indigo-200 font-bold text-lg md:text-xl flex items-center gap-2">
                     <span>Specialty:</span>
-                    <span className="text-white font-black tracking-tight">{player.topic}</span>
+                    <span className="text-white font-extrabold">{player.topic}</span>
                   </div>
                 )}
 
@@ -3047,7 +2673,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   } else {
     setStage('score');
   }
-}
+};
               }}
               className="mt-16 px-8 py-4 bg-rose-500 text-white font-bold text-xl rounded-full shadow-lg hover:bg-rose-600 transition-colors"
             >
@@ -3117,7 +2743,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   } else {
     setStage('score');
   }
-}
+};
                 }
               }}
               className="mt-16 px-8 py-4 bg-slate-500 text-white font-bold text-xl rounded-full shadow-lg hover:bg-slate-600 transition-colors"
@@ -3234,7 +2860,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
   } else {
     setStage('score');
   }
-}
+};
                 }}
                 className="px-8 py-4 bg-rose-500 text-white font-bold text-xl rounded-full shadow-lg hover:bg-rose-600 transition-all hover:scale-105 active:translate-y-1"
               >
@@ -3269,10 +2895,10 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             key={`q-container-${currentQuestionIndex}`}
             className="relative"
             style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}
-            initial={{ opacity: 0, x: currentQuestionIndex % 2 === 0 ? '120vw' : '-120vw', y: 100, rotateZ: currentQuestionIndex % 2 === 0 ? 15 : -15, scale: 0.5 }}
-            animate={{ opacity: 1, x: 0, y: 0, rotateZ: 0, scale: 1 }}
-            exit={{ opacity: 0, x: currentQuestionIndex % 2 === 0 ? '-120vw' : '120vw', y: -100, rotateZ: currentQuestionIndex % 2 === 0 ? -15 : 15, scale: 0.8 }}
-            transition={{ type: "spring", stiffness: 100, damping: 16, mass: 1 }}
+            initial={{ opacity: 0, x: 100, scale: 0.98 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -100, scale: 1.02 }}
+            transition={{ type: "spring", stiffness: 200, damping: 25 }}
           >
             {quiz.mode === 'interactive' && (
               <ParticipantVideoFrames
@@ -3419,7 +3045,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       🏆 {badgeTitle}
                     </div>
 
-                    <div className="text-white font-black tracking-tight text-3xl sm:text-4xl drop-shadow-md">
+                    <div className="text-white font-extrabold text-3xl sm:text-4xl drop-shadow-md">
                       {playerName} Earned a Badge!
                     </div>
 
@@ -3434,7 +3060,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             })()}
           <motion.div
             key={`q-container-inner-${currentQuestionIndex}`}
-            className={`${quiz.mode === 'interactive' ? 'w-[calc(100%-16rem)] sm:w-[calc(100%-18rem)] md:w-[calc(100%-22rem)] lg:w-[calc(100%-25rem)] ml-2 sm:ml-4 md:ml-8 mr-auto justify-center' : 'w-[90vw] mx-auto'} max-w-[1800px] h-[90vh] mt-[5vh] flex flex-col z-10 ${currentType === '5-clues' || currentType === 'detective' || currentType === 'find-in-map' ? 'p-4 md:p-6' : 'p-8 md:p-12'}`}
+            className={`${quiz.mode === 'interactive' ? 'w-[calc(100%-16rem)] sm:w-[calc(100%-18rem)] md:w-[calc(100%-22rem)] lg:w-[calc(100%-25rem)] ml-2 sm:ml-4 md:ml-8 mr-auto justify-center' : 'w-[90vw] mx-auto'} max-w-[1800px] h-full flex flex-col z-10 ${currentType === '5-clues' || currentType === 'detective' || currentType === 'find-in-map' ? 'p-4 md:p-6' : 'p-8 md:p-12'}`}
           >
             {/* Top Bar */}
             {/* Milestone Progress Bar */}
@@ -3496,7 +3122,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   <Lightbulb className="w-6 h-6" /> 50/50
                 </button>
               )}
-              <div className="bg-indigo-600/90 backdrop-blur-xl text-white px-8 py-3 rounded-full shadow-[0_10px_30px_rgba(79,70,229,0.3)] font-black text-2xl tracking-widest uppercase flex items-center gap-3 border-[4px] border-indigo-400/80">
+              <div className="bg-indigo-700 text-white px-8 py-3 rounded-full shadow-2xl font-black text-2xl tracking-widest uppercase flex items-center gap-3 border-4 border-indigo-400">
                 <Star className="w-6 h-6 text-yellow-300 fill-current" />
                 <span>
                   {quiz.mode === 'interactive' && isMultipleFiles
@@ -3506,101 +3132,102 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 <Star className="w-6 h-6 text-yellow-300 fill-current" />
               </div>
 
-
+              <div className="flex items-center gap-3 bg-white px-8 py-3 rounded-full shadow-2xl border-4 border-slate-100 text-slate-800">
+                <Clock className="w-8 h-8 text-rose-500 animate-pulse" />
+                <span className="text-3xl font-black tabular-nums">{timeLeft}s</span>
+              </div>
             </div>
 
             {/* Question Card */}
             {quiz.type === 'combat-mode' ? (
-              <div className="flex-1 w-full flex gap-4 md:gap-8 overflow-hidden mb-6 z-10">
+              <div className="flex-1 w-full flex flex-col md:flex-row gap-8 md:gap-12 overflow-hidden mb-6 z-10 relative px-4 py-8">
+                {/* VS Badge */}
+                <motion.div 
+                   initial={{ scale: 0, opacity: 0, rotate: -180 }}
+                   animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                   transition={{ duration: 0.8, type: 'spring', bounce: 0.6, delay: 0.5 }}
+                   className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-24 h-24 md:w-32 md:h-32 bg-gradient-to-br from-yellow-400 to-red-600 rounded-full flex items-center justify-center border-[8px] md:border-[12px] border-white shadow-[0_0_60px_rgba(239,68,68,0.8)] text-white font-black italic text-4xl md:text-6xl"
+                >
+                   VS
+                </motion.div>
+
                 {/* Left Player */}
-                <div className="flex-1 flex flex-col bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-t-[4px] border-white/80 border-b-[12px] border-slate-200 p-6 md:p-10 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-slate-100 rounded-full -mr-16 -mt-16" />
-                  <h3 className="text-slate-500 font-black tracking-widest uppercase mb-4 text-xl relative z-10">Player 1</h3>
-                  <h2 style={{ fontFamily: "var(--font-display)" }} className="font-black tracking-tight text-slate-900 text-3xl md:text-4xl lg:text-[3rem] leading-tight mb-8 drop-shadow-sm flex-1 relative z-10">
+                <motion.div 
+                   initial={{ x: -100, opacity: 0, rotateY: -10 }}
+                   animate={{ x: 0, opacity: 1, rotateY: 0 }}
+                   transition={{ duration: 0.6, type: 'spring' }}
+                   className="flex-1 flex flex-col bg-white/95 backdrop-blur-xl rounded-[3rem] shadow-[0_30px_70px_rgba(0,0,0,0.3)] border-b-[16px] border-indigo-400 p-8 md:p-12 relative overflow-visible"
+                >
+                  <div className="absolute -top-16 -left-16 w-48 h-48 bg-indigo-500/20 blur-3xl rounded-full pointer-events-none" />
+                  <div className="absolute top-0 right-0 w-full h-2 bg-gradient-to-r from-transparent to-indigo-500/30" />
+                  
+                  <h3 className="text-indigo-600 font-black tracking-widest uppercase mb-4 text-2xl relative z-10 flex items-center gap-3 bg-indigo-50 inline-block px-6 py-2 rounded-full self-start shadow-inner border-2 border-indigo-100">
+                    <Sparkles className="w-6 h-6" /> Player 1
+                  </h3>
+                  <h2 className="font-extrabold text-slate-800 text-3xl md:text-5xl lg:text-6xl leading-tight mb-8 drop-shadow-sm flex-1 relative z-10">
                     {question.combatLeft?.question}
                   </h2>
                   <div className="flex flex-col gap-4 w-full mt-auto relative z-10">
                     {question.combatLeft?.options?.map((option, i) => {
                       const isCorrect = option === question.combatLeft?.correctAnswer;
                       const isReveal = stage === 'reveal';
-                      let cardClass = "bg-white text-slate-700 border-2 border-slate-200 hover:bg-slate-50 hover:border-slate-300 border-b-[6px] hover:border-b-[6px]";
+                      let cardClass = "bg-slate-100 text-slate-800 border-[6px] border-slate-200 hover:border-indigo-300";
                       if (isReveal) {
-                        if (isCorrect) cardClass = "bg-emerald-500 text-white border-2 border-emerald-600 border-b-[6px] shadow-xl scale-[1.03]";
-                        else cardClass = "bg-slate-50 text-slate-400 border-2 border-transparent opacity-60";
+                        if (isCorrect) cardClass = "bg-gradient-to-r from-emerald-400 to-emerald-500 text-white border-[6px] border-emerald-600 shadow-[0_0_30px_rgba(16,185,129,0.6)] scale-[1.03]";
+                        else cardClass = "bg-slate-50 text-slate-300 border-[6px] border-transparent opacity-50";
                       }
                       return (
-                        <motion.div 
-                          key={`l-${i}`} 
-                          animate={isReveal && isCorrect ? { 
-                            scale: [1, 1.03, 1], 
-                            boxShadow: ["0 10px 15px -3px rgba(0, 0, 0, 0.1)", "0 0 30px 10px rgba(16,185,129,0.6)", "0 10px 15px -3px rgba(0, 0, 0, 0.1)"]
-                          } : { scale: 1 }}
-                          transition={isReveal && isCorrect ? { repeat: Infinity, duration: 2, ease: "easeInOut" } : {}}
-                          className={`relative overflow-hidden px-6 py-5 rounded-3xl text-xl md:text-2xl font-bold flex items-center gap-4 transition-all duration-300 transform active:scale-95 ${cardClass} shadow-md`}>
-                          {isReveal && isCorrect && (
-                            <motion.div
-                              className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12"
-                              initial={{ x: '-150%' }}
-                              animate={{ x: '150%' }}
-                              transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut', repeatDelay: 1 }}
-                            />
-                          )}
-                          <div className={`relative z-10 w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-black text-lg ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
-                            {optionLetters[i]}
+                        <motion.div key={`l-${i}`} className={`px-6 py-4 rounded-3xl text-xl md:text-2xl font-bold flex items-center gap-5 transition-all duration-500 ${cardClass}`}>
+                          <div className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center font-black text-xl shadow-inner ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-white text-slate-400'}`}>
+                            {['A','B','C','D'][i]}
                           </div>
-                          <span className="relative z-10 leading-tight">{option}</span>
+                          <span className="leading-tight">{option}</span>
                         </motion.div>
                       );
                     })}
                   </div>
-                </div>
-
+                </motion.div>
+                
                 {/* Right Player */}
-                <div className="flex-1 flex flex-col bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-t-[4px] border-white/80 border-b-[12px] border-slate-200 p-6 md:p-10 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-32 h-32 bg-slate-100 rounded-full -ml-16 -mt-16" />
-                  <h3 className="text-slate-500 font-black tracking-widest uppercase mb-4 text-xl text-right relative z-10">Player 2</h3>
-                  <h2 style={{ fontFamily: "var(--font-display)" }} className="font-black tracking-tight text-slate-900 text-3xl md:text-4xl lg:text-[3rem] leading-tight mb-8 drop-shadow-sm flex-1 text-right relative z-10">
+                <motion.div 
+                   initial={{ x: 100, opacity: 0, rotateY: 10 }}
+                   animate={{ x: 0, opacity: 1, rotateY: 0 }}
+                   transition={{ duration: 0.6, type: 'spring' }}
+                   className="flex-1 flex flex-col bg-white/95 backdrop-blur-xl rounded-[3rem] shadow-[0_30px_70px_rgba(0,0,0,0.3)] border-b-[16px] border-rose-400 p-8 md:p-12 relative overflow-visible"
+                >
+                  <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-rose-500/20 blur-3xl rounded-full pointer-events-none" />
+                  <div className="absolute top-0 right-0 w-full h-2 bg-gradient-to-l from-transparent to-rose-500/30" />
+                  
+                  <h3 className="text-rose-600 font-black tracking-widest uppercase mb-4 text-2xl relative z-10 flex items-center gap-3 bg-rose-50 inline-block px-6 py-2 rounded-full self-start shadow-inner border-2 border-rose-100">
+                    <Rocket className="w-6 h-6" /> Player 2
+                  </h3>
+                  <h2 className="font-extrabold text-slate-800 text-3xl md:text-5xl lg:text-6xl leading-tight mb-8 drop-shadow-sm flex-1 relative z-10">
                     {question.combatRight?.question}
                   </h2>
                   <div className="flex flex-col gap-4 w-full mt-auto relative z-10">
                     {question.combatRight?.options?.map((option, i) => {
                       const isCorrect = option === question.combatRight?.correctAnswer;
                       const isReveal = stage === 'reveal';
-                      let cardClass = "bg-white text-slate-700 border-2 border-slate-200 hover:bg-slate-50 hover:border-slate-300 border-b-[6px] hover:border-b-[6px]";
+                      let cardClass = "bg-slate-100 text-slate-800 border-[6px] border-slate-200 hover:border-rose-300";
                       if (isReveal) {
-                        if (isCorrect) cardClass = "bg-emerald-500 text-white border-2 border-emerald-600 border-b-[6px] shadow-xl scale-[1.03]";
-                        else cardClass = "bg-slate-50 text-slate-400 border-2 border-transparent opacity-60";
+                        if (isCorrect) cardClass = "bg-gradient-to-r from-emerald-400 to-emerald-500 text-white border-[6px] border-emerald-600 shadow-[0_0_30px_rgba(16,185,129,0.6)] scale-[1.03]";
+                        else cardClass = "bg-slate-50 text-slate-300 border-[6px] border-transparent opacity-50";
                       }
                       return (
-                        <motion.div 
-                          key={`r-${i}`} 
-                          animate={isReveal && isCorrect ? { 
-                            scale: [1, 1.03, 1], 
-                            boxShadow: ["0 10px 15px -3px rgba(0, 0, 0, 0.1)", "0 0 30px 10px rgba(16,185,129,0.6)", "0 10px 15px -3px rgba(0, 0, 0, 0.1)"]
-                          } : { scale: 1 }}
-                          transition={isReveal && isCorrect ? { repeat: Infinity, duration: 2, ease: "easeInOut" } : {}}
-                          className={`relative overflow-hidden px-6 py-5 rounded-3xl text-xl md:text-2xl font-bold flex items-center gap-4 transition-all duration-300 transform active:scale-95 ${cardClass} shadow-md`}>
-                          {isReveal && isCorrect && (
-                            <motion.div
-                              className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12"
-                              initial={{ x: '-150%' }}
-                              animate={{ x: '150%' }}
-                              transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut', repeatDelay: 1 }}
-                            />
-                          )}
-                          <div className={`relative z-10 w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-black text-lg ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
-                            {optionLetters[i]}
+                        <motion.div key={`r-${i}`} className={`px-6 py-4 rounded-3xl text-xl md:text-2xl font-bold flex items-center gap-5 transition-all duration-500 ${cardClass}`}>
+                          <div className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center font-black text-xl shadow-inner ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-white text-slate-400'}`}>
+                            {['A','B','C','D'][i]}
                           </div>
-                          <span className="relative z-10 leading-tight">{option}</span>
+                          <span className="leading-tight">{option}</span>
                         </motion.div>
                       );
                     })}
                   </div>
-                </div>
+                </motion.div>
               </div>
             ) : (
               <>
-                <div className={`bg-white/95 backdrop-blur-3xl rounded-[3rem] shadow-[0_40px_80px_rgba(0,0,0,0.3)] flex flex-col ${quiz.mode === 'interactive' ? 'items-start text-left justify-center' : 'items-center justify-center'} border-[8px] border-white/90 border-b-[16px] shadow-inner flex-1 min-h-0 overflow-hidden z-10 relative pt-16 md:pt-20 ${currentType === '5-clues' || currentType === 'detective' || currentType === 'match-the-following' || currentType === 'word-search' ? 'px-6 pb-6 md:px-8 md:pb-8 mb-6 gap-6 shrink-0' : currentType === 'find-in-map' ? `px-6 pb-6 md:px-8 md:pb-8 mb-6 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-6` : `px-8 pb-8 md:px-12 md:pb-12 mb-8 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-8`}`}>
+                <div className={`bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col ${quiz.mode === 'interactive' ? 'items-start text-left justify-center' : 'items-center justify-center'} border-b-[12px] border-slate-200 z-10 relative pt-16 md:pt-20 ${currentType === '5-clues' || currentType === 'detective' || currentType === 'match-the-following' || currentType === 'word-search' ? 'px-6 pb-6 md:px-8 md:pb-8 mb-6 gap-6 shrink-0' : currentType === 'find-in-map' ? `px-6 pb-6 md:px-8 md:pb-8 mb-6 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-6` : `px-8 pb-8 md:px-12 md:pb-12 mb-8 ${quiz.mode === 'interactive' ? 'shrink-0' : 'flex-1'} gap-8`}`}>
                   
 
 
@@ -3608,16 +3235,15 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 {((question.imageUrl && !imageError) || uploadedImages[currentQuestionIndex] || (quiz.mode === 'interactive' && isImageQuestion)) && currentType !== 'find-in-map' && (isImageQuestion || currentType === 'multiple-choice' || stage === 'reveal' || (quiz.mode === 'interactive' && (interactiveOptionClicked !== null || answeredQuestions.has(currentQuestionIndex)))) && (
                   <div className={
                     isImageQuestion
-                      ? "w-full max-w-5xl h-[30vh] md:h-[40vh] max-h-[400px] rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 mx-0 relative group flex-1"
+                      ? "w-full max-w-5xl h-[50vh] md:h-[600px] rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 mx-0 relative group flex-1"
                       : `shrink-0 rounded-3xl overflow-hidden shadow-2xl border-8 border-slate-100 relative group ${currentType === '5-clues' || currentType === 'detective' || currentType === 'match-the-following' || currentType === 'word-search' ? 'w-40 h-40 md:w-48 md:h-48' : 'w-48 h-48 md:w-72 md:h-72'}`
                   }>
                     {uploadedImages[currentQuestionIndex] || (question.imageUrl && !imageError) ? (
-                      <motion.img 
+                      <img 
                         src={uploadedImages[currentQuestionIndex] || question.imageUrl} 
                         alt="Identify this" 
-                        animate={quiz.mode === 'video' ? { x: [0, 8, -8, 4, -4, 0], y: [0, -8, 8, -4, 4, 0] } : {}}
-                        transition={quiz.mode === 'video' ? { repeat: Infinity, duration: 6, ease: "easeInOut" } : {}}
-                        className={`w-full h-full object-contain bg-slate-50 transition-all duration-[2000ms] ease-out ${(currentType === 'blurred-image' && stage === 'question') ? (question.blurTechnique === 'heavy-blur' ? 'blur-lg scale-110 opacity-90' : question.blurTechnique === 'pixelated-blur' ? 'blur-md contrast-150 scale-110 saturate-150' : question.blurTechnique === 'grayscale-blur' ? 'blur-sm grayscale scale-105' : 'blur-md scale-105') : 'blur-0 scale-100 contrast-100 grayscale-0 saturate-100 opacity-100'}`} 
+                        className="w-full h-full object-contain bg-slate-50 transition-all duration-1000 ease-in-out" 
+                        style={getBlurStyle()} 
                         crossOrigin="anonymous"
                         referrerPolicy="no-referrer"
                         onError={(e) => { if (question.imagePreviewUrl && e.currentTarget.src !== question.imagePreviewUrl) { e.currentTarget.src = question.imagePreviewUrl; } else { setImageError(true); } }}
@@ -3631,36 +3257,16 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
 
                   </div>
                 )}
-                {(quiz.isOfflineMode || !isImageQuestion) && currentType !== 'a-to-z' && (
-                  <motion.h2 
-                    initial={{ opacity: 0, y: -20, scale: 0.9 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ delay: 0.2, type: "spring", stiffness: 120 }}
-                    style={{ fontFamily: "var(--font-display)" }} 
-                    className={`font-black tracking-tight text-slate-900 ${quiz.mode === 'interactive' ? 'text-left' : 'text-center'} leading-tight drop-shadow-sm flex-1 ${currentType === '5-clues' || currentType === 'detective' || currentType === 'find-in-map' || isJumbledLetters || currentType === 'match-the-following' || currentType === 'word-search' ? 'text-3xl md:text-4xl lg:text-[3rem] p-2' : 'text-4xl md:text-5xl lg:text-[4.5rem] p-4'}`}>
+                {(quiz.isOfflineMode || !isImageQuestion) && (
+                  <h2 className={`font-extrabold text-slate-800 ${quiz.mode === 'interactive' ? 'text-left' : 'text-center'} leading-tight drop-shadow-sm flex-1 ${currentType === '5-clues' || currentType === 'detective' || currentType === 'find-in-map' || isJumbledLetters || currentType === 'match-the-following' || currentType === 'word-search' ? 'text-4xl md:text-5xl lg:text-6xl' : 'text-5xl md:text-6xl lg:text-7xl'}`}>
                     {question.question || 'Unjumble the word!'}
-                  </motion.h2>
-                )}
-                {currentType === 'a-to-z' && (
-                  <div className={`flex flex-col flex-1 ${quiz.mode === 'interactive' ? 'items-start text-left' : 'items-center text-center'} justify-center w-full`}>
-                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-slate-600 mb-4 md:mb-8 drop-shadow-sm">
-                      {question.question || 'Name something starting with...'}
-                    </h2>
-                    <motion.div 
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: "spring", bounce: 0.6 }}
-                      className="text-[10rem] md:text-[14rem] lg:text-[18rem] font-black leading-none drop-shadow-[0_30px_60px_rgba(79,70,229,0.4)] bg-clip-text text-transparent bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500"
-                    >
-                      {question.question ? question.question.trim().slice(-1).toUpperCase() : String.fromCharCode(65 + (currentQuestionIndex % 26))}
-                    </motion.div>
-                  </div>
+                  </h2>
                 )}
               </div>
               
               {isJumbledLetters && (
                 <div className={`flex flex-col ${quiz.mode === 'interactive' ? 'items-start text-left' : 'items-center'} gap-8 w-full mt-2`}>
-                  <div className={`flex flex-wrap gap-2 sm:gap-3 md:gap-4 ${quiz.mode === 'interactive' ? 'justify-start' : 'justify-center'} w-full`}>
+                  <div className={`flex flex-wrap gap-3 sm:gap-4 md:gap-6 ${quiz.mode === 'interactive' ? 'justify-start' : 'justify-center'} w-full relative z-10`}>
                     {(() => {
                       const rawAnswer = question.correctAnswer || question.answer || question.word || question.correct_answer || question.brand_name || '';
                       const word = rawAnswer.replace(/\s/g, '').toUpperCase();
@@ -3671,12 +3277,14 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                         <motion.div 
                           key={`${item.id}-${i}`}
                           layout
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ delay: stage === 'reveal' ? 0 : i * 0.08, type: 'spring', stiffness: 300, damping: 20 }}
-                          className={`w-16 h-22 sm:w-20 sm:h-28 md:w-28 md:h-36 lg:w-32 lg:h-40 rounded-2xl shadow-[0_10px_20px_rgba(0,0,0,0.15)] flex items-center justify-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black border-b-[10px] md:border-b-[14px] uppercase z-10 transition-colors ${stage === 'reveal' ? 'bg-emerald-500 text-white border-emerald-700 shadow-[0_0_40px_rgba(16,185,129,0.5)]' : 'bg-slate-100 text-indigo-600 border-indigo-200'}`}
+                          initial={{ scale: 0, rotateY: 180, opacity: 0 }}
+                          animate={{ scale: 1, rotateY: 0, opacity: 1 }}
+                          transition={{ delay: stage === 'reveal' ? i * 0.05 : i * 0.08, type: 'spring', stiffness: 200, damping: 15 }}
+                          whileHover={{ scale: 1.05, y: -10, rotateZ: (Math.random() - 0.5) * 10 }}
+                          className={`w-16 h-22 sm:w-20 sm:h-28 md:w-28 md:h-36 lg:w-32 lg:h-40 rounded-3xl shadow-[0_15px_30px_rgba(0,0,0,0.2)] flex items-center justify-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black border-b-[12px] md:border-b-[16px] uppercase z-10 transition-colors duration-500 ${stage === 'reveal' ? 'bg-gradient-to-b from-emerald-400 to-emerald-600 text-white border-emerald-800 shadow-[0_0_50px_rgba(16,185,129,0.8)]' : 'bg-gradient-to-b from-white to-slate-100 text-indigo-700 border-indigo-300 backdrop-blur-md'}`}
                         >
-                          {item.char}
+                          <span className="drop-shadow-md relative z-10">{item.char}</span>
+                          <div className="absolute inset-0 bg-white/20 rounded-3xl opacity-0 hover:opacity-100 transition-opacity" />
                         </motion.div>
                       ));
                     })()}
@@ -3686,7 +3294,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               
               {currentType === 'find-in-map' && (
                 <div className="w-full flex-1 min-h-[300px] max-h-[60vh] shrink-0 mt-4 rounded-3xl overflow-hidden relative">
-                  <MapQuestion question={question} timeLeft={stage === 'reveal' ? 0 : timeLeft} isInteractiveMode={quiz.mode === 'interactive'} />
+                  <MapQuestion question={question} timeLeft={timeLeft} />
                 </div>
               )}
               
@@ -3720,7 +3328,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       }
                     }
                     return (
-                      <motion.div key={i} 
+                      <div key={i} 
                         onClick={() => {
                           if (isEliminated) return;
                           if (quiz.mode === 'interactive' && !isReveal) {
@@ -3786,25 +3394,12 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                             }
                           }
                         }}
-                        animate={isReveal && isCorrect ? { 
-                          scale: [1, 1.03, 1], 
-                          boxShadow: ["0 10px 15px -3px rgba(0, 0, 0, 0.1)", "0 0 40px 10px rgba(16,185,129,0.6)", "0 10px 15px -3px rgba(0, 0, 0, 0.1)"]
-                        } : { scale: 1 }}
-                        transition={isReveal && isCorrect ? { repeat: Infinity, duration: 2, ease: "easeInOut" } : {}}
-                        className={`relative overflow-hidden px-4 py-3 rounded-2xl text-2xl md:text-3xl lg:text-4xl font-bold flex items-center gap-4 transition-all duration-500 ${optClass}`}>
-                        {isReveal && isCorrect && (
-                          <motion.div
-                            className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12"
-                            initial={{ x: '-150%' }}
-                            animate={{ x: '150%' }}
-                            transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut', repeatDelay: 1 }}
-                          />
-                        )}
-                        <div className={`relative z-10 w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-full flex items-center justify-center font-black text-xl md:text-2xl shadow-inner ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-white text-slate-500'}`}>
+                        className={`px-6 py-5 rounded-2xl text-2xl md:text-3xl font-bold flex items-center gap-4 transition-all duration-500 ${optClass}`}>
+                        <div className={`w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-full flex items-center justify-center font-black text-xl md:text-2xl shadow-inner ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-white text-slate-500'}`}>
                           {optionLetters[i]}
                         </div>
-                        <span className="relative z-10 leading-tight truncate" title={option}>{option}</span>
-                      </motion.div>
+                        <span className="leading-tight truncate" title={option}>{option}</span>
+                      </div>
                     );
                   })}
                 </div>
@@ -3945,31 +3540,36 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             )}
             
             {(currentType === '5-clues' || question.type === '5-clues') && !isJumbledLetters && (
-              <div className="flex-1 w-full shrink-0 mb-6 flex flex-col gap-2 md:gap-3">
+              <div className="flex-1 w-full shrink-0 mb-6 flex flex-col gap-3 md:gap-4 relative px-4 z-10">
                 {question.clues?.map((clue, i) => {
                   const isVisible = i <= clueIndex || stage === 'reveal';
                   return (
                     <motion.div
                       key={i}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-                      transition={{ duration: 0.5 }}
-                      className={`px-3 py-2 md:px-4 md:py-3 rounded-2xl text-xl md:text-2xl lg:text-3xl font-bold p-1 shadow-lg flex items-center gap-4 transform transition-all ${isVisible ? 'bg-white text-slate-800 border-l-8 border-indigo-500' : 'hidden'}`}
+                      initial={{ opacity: 0, x: -100, rotateY: -20, scale: 0.8 }}
+                      animate={isVisible ? { opacity: 1, x: 0, rotateY: 0, scale: 1 } : { opacity: 0, x: -100, rotateY: -20, scale: 0.8 }}
+                      transition={{ duration: 0.6, type: 'spring', bounce: 0.4 }}
+                      className={`px-6 py-4 md:px-8 md:py-6 rounded-3xl text-xl md:text-3xl font-bold shadow-[0_15px_40px_rgba(0,0,0,0.15)] flex items-center gap-6 transform transition-all ${isVisible ? 'bg-white/95 backdrop-blur-xl text-slate-800 border-l-[12px] border-indigo-500' : 'hidden'}`}
                     >
-                      <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-xl md:text-2xl shadow-inner">
+                      <div className="w-12 h-12 md:w-16 md:h-16 shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-2xl md:text-3xl shadow-[0_0_20px_rgba(99,102,241,0.5)] border-4 border-indigo-200">
                         {i + 1}
                       </div>
-                      <span className="leading-tight">{clue}</span>
+                      <span className="leading-snug tracking-tight relative z-10">{clue}</span>
+                      
+                      {/* Decorative background element for clue card */}
+                      <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-indigo-50/50 to-transparent rounded-r-3xl pointer-events-none" />
                     </motion.div>
                   );
                 })}
                 {stage === 'reveal' && (
                   <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="mt-2 px-6 py-4 rounded-3xl bg-emerald-500 text-white border-b-8 border-emerald-700 shadow-[0_0_50px_rgba(16,185,129,0.8)] text-3xl md:text-4xl font-black text-center"
+                    initial={{ scale: 0.9, opacity: 0, y: 50 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    transition={{ type: 'spring', bounce: 0.5, delay: 0.5 }}
+                    className="mt-6 px-8 py-6 rounded-[2rem] bg-gradient-to-b from-emerald-400 to-emerald-600 text-white border-b-[12px] border-emerald-800 shadow-[0_20px_50px_rgba(16,185,129,0.5)] text-3xl md:text-5xl font-black text-center relative overflow-hidden"
                   >
-                    Answer: {question.correctAnswer}
+                    <div className="absolute -top-24 -right-24 w-48 h-48 bg-white/20 blur-3xl rounded-full" />
+                    <span className="relative z-10">Answer: {question.correctAnswer}</span>
                   </motion.div>
                 )}
               </div>
@@ -3985,7 +3585,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       initial={{ opacity: 0, y: 20 }}
                       animate={isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                       transition={{ duration: 0.5 }}
-                      className={`px-4 py-3 md:px-6 md:py-4 rounded-2xl text-2xl md:text-3xl lg:text-4xl font-bold p-2 shadow-lg flex items-center gap-6 transform transition-all ${isVisible ? 'bg-white text-slate-800 border-l-[12px] border-indigo-500' : 'hidden'}`}
+                      className={`px-6 py-5 md:px-8 md:py-6 rounded-3xl text-3xl md:text-4xl lg:text-5xl font-bold shadow-lg flex items-center gap-6 transform transition-all ${isVisible ? 'bg-white text-slate-800 border-l-[12px] border-indigo-500' : 'hidden'}`}
                     >
                       <div className="w-16 h-16 md:w-20 md:h-20 shrink-0 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-black text-3xl md:text-4xl shadow-inner">
                         {i + 1}
@@ -4060,7 +3660,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 </div>
                 <div className="flex flex-col gap-3 md:gap-4 w-1/2">
                   {(stage === 'reveal' ? question.pairs.map(p => p.right) : shuffledRights).map((right, i) => (
-                    <motion.div layout key={`right-${right}`} layoutId={`right-${right}`} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: stage === 'reveal' ? i * 0.4 : i * 0.1, type: 'spring', bounce: 0.4, duration: 0.8 }} className={`px-6 py-6 md:px-8 md:py-8 ${stage === 'reveal' ? 'bg-emerald-500 border-emerald-700 text-white border-b-[12px] shadow-[0_0_30px_rgba(16,185,129,0.4)]' : 'bg-slate-100 border-slate-200 text-slate-900 border-b-[12px]'} rounded-3xl text-3xl md:text-5xl lg:text-6xl font-bold flex items-center justify-center min-h-[120px] md:min-h-[150px] text-center leading-tight`}>
+                    <motion.div layout key={`right-${right}`} layoutId={`right-${right}`} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: stage === 'reveal' ? i * 0.4 : i * 0.1, type: 'spring', bounce: 0.4, duration: 0.8 }} className={`px-6 py-6 md:px-8 md:py-8 ${stage === 'reveal' ? 'bg-emerald-500 border-emerald-700 text-white border-b-[12px] shadow-[0_0_30px_rgba(16,185,129,0.4)]' : 'bg-slate-100 border-slate-200 text-slate-800 border-b-[12px]'} rounded-3xl text-3xl md:text-5xl lg:text-6xl font-bold flex items-center justify-center min-h-[120px] md:min-h-[150px] text-center leading-tight`}>
                       {right}
                     </motion.div>
                   ))}
@@ -4069,33 +3669,87 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             )}
 
             {currentType === 'word-search' && question.grid && (
-              <div className="w-full flex-1 flex flex-col items-center justify-center mt-4 mb-6">
-                <div className="grid grid-cols-10 gap-1 md:gap-2 bg-indigo-100 p-3 md:p-5 rounded-3xl shadow-inner border-8 border-indigo-200">
-                  {question.grid.map((row, r) => (
-                    row.map((cell, c) => {
-                      let isHighlighted = false;
-                      if (stage === 'reveal' && question.wordLocations) {
-                        const wordLoc = question.wordLocations.find(w => w.cells.some(cellPos => cellPos.r === r && cellPos.c === c));
-                        if (wordLoc) isHighlighted = true;
-                      }
+              <div className="w-full flex-1 flex flex-col items-center justify-center mt-2 mb-6 relative z-10">
+                <div className="relative p-6 md:p-8 bg-white/80 backdrop-blur-xl rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.15)] border-b-[16px] border-indigo-400 overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/10 pointer-events-none" />
+                  
+                  {/* Decorative corner accents */}
+                  <div className="absolute top-0 left-0 w-16 h-16 border-t-4 border-l-4 border-indigo-300 rounded-tl-[2.5rem] opacity-50 pointer-events-none" />
+                  <div className="absolute bottom-0 right-0 w-16 h-16 border-b-4 border-r-4 border-indigo-300 rounded-br-[2.5rem] opacity-50 pointer-events-none" />
 
-                      return (
-                        <div key={`${r}-${c}`} className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-[4rem] lg:h-[4rem] flex items-center justify-center rounded-xl md:rounded-2xl text-2xl sm:text-3xl md:text-4xl lg:text-[2.2rem] font-black transition-all duration-500 border-b-[6px] ${isHighlighted ? 'bg-emerald-400 text-white border-emerald-600 shadow-[0_0_20px_rgba(16,185,129,0.8)] z-10 scale-110' : 'bg-white text-slate-700 border-slate-200'}`}>
-                           {cell}
-                        </div>
-                      );
-                    })
-                  ))}
-                </div>
-                {stage === 'reveal' && question.wordsToFind && (
-                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8 flex flex-wrap gap-4 justify-center max-w-4xl">
-                    {question.wordsToFind.map((word, i) => (
-                      <div key={word} className="px-6 py-3 bg-white text-emerald-600 font-black text-2xl md:text-3xl rounded-full shadow-lg border-4 border-emerald-100 uppercase tracking-widest">
-                        {word}
-                      </div>
+                  <div className="grid grid-cols-10 gap-2 md:gap-3 relative z-10">
+                    {question.grid.map((row, r) => (
+                      row.map((cell, c) => {
+                        let isHighlighted = false;
+                        let highlightIndex = 0;
+                        if (stage === 'reveal' && question.wordLocations) {
+                          const wordLocIndex = question.wordLocations.findIndex(w => w.cells.some(cellPos => cellPos.r === r && cellPos.c === c));
+                          if (wordLocIndex !== -1) {
+                            isHighlighted = true;
+                            highlightIndex = wordLocIndex;
+                          }
+                        }
+
+                        // Colors for different words
+                        const highlightColors = [
+                          'from-emerald-400 to-emerald-600 border-emerald-700 shadow-emerald-500/50',
+                          'from-rose-400 to-rose-600 border-rose-700 shadow-rose-500/50',
+                          'from-amber-400 to-amber-600 border-amber-700 shadow-amber-500/50',
+                          'from-cyan-400 to-cyan-600 border-cyan-700 shadow-cyan-500/50',
+                          'from-fuchsia-400 to-fuchsia-600 border-fuchsia-700 shadow-fuchsia-500/50',
+                        ];
+                        const colorClass = isHighlighted ? highlightColors[highlightIndex % highlightColors.length] : 'from-slate-50 to-white border-slate-200 text-slate-700';
+
+                        return (
+                          <motion.div 
+                            key={`${r}-${c}`} 
+                            initial={{ scale: 0, opacity: 0, rotateX: -90 }}
+                            animate={{ scale: 1, opacity: 1, rotateX: 0 }}
+                            transition={{ delay: (r * 10 + c) * 0.015, type: 'spring', stiffness: 200, damping: 12 }}
+                            whileHover={!isHighlighted ? { scale: 1.1, zIndex: 20, rotateZ: (Math.random() - 0.5) * 10, y: -4 } : {}}
+                            className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-[4rem] lg:h-[4rem] flex items-center justify-center rounded-2xl text-2xl sm:text-3xl md:text-4xl lg:text-[2.2rem] font-black transition-all duration-500 border-b-[6px] md:border-b-[8px] bg-gradient-to-b ${isHighlighted ? `text-white scale-110 z-10 shadow-[0_10px_25px_var(--tw-shadow-color)] ${colorClass}` : `${colorClass} shadow-md`}`}
+                          >
+                             <span className={isHighlighted ? "drop-shadow-md" : ""}>{cell}</span>
+                          </motion.div>
+                        );
+                      })
                     ))}
-                  </motion.div>
-                )}
+                  </div>
+                </div>
+
+                <AnimatePresence>
+                  {stage === 'reveal' && question.wordsToFind && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 40, scale: 0.9 }} 
+                      animate={{ opacity: 1, y: 0, scale: 1 }} 
+                      transition={{ delay: 0.8, type: 'spring', bounce: 0.5 }}
+                      className="mt-8 flex flex-wrap gap-4 justify-center max-w-4xl"
+                    >
+                      {question.wordsToFind.map((word, i) => {
+                        const highlightColors = [
+                          'text-emerald-700 bg-emerald-100 border-emerald-300',
+                          'text-rose-700 bg-rose-100 border-rose-300',
+                          'text-amber-700 bg-amber-100 border-amber-300',
+                          'text-cyan-700 bg-cyan-100 border-cyan-300',
+                          'text-fuchsia-700 bg-fuchsia-100 border-fuchsia-300',
+                        ];
+                        const colorClass = highlightColors[i % highlightColors.length];
+                        return (
+                          <motion.div 
+                            key={word} 
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 1 + i * 0.15 }}
+                            className={`px-6 py-3 font-black text-2xl md:text-3xl rounded-2xl shadow-lg border-b-[6px] uppercase tracking-widest flex items-center gap-3 ${colorClass}`}
+                          >
+                            <Sparkles className="w-6 h-6 opacity-80" />
+                            {word}
+                          </motion.div>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
 
@@ -4119,7 +3773,59 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
               </div>
             )}
 
-            {!isJumbledLetters && currentType !== 'text-presentation' && currentType !== '5-clues' && currentType !== 'detective' && currentType !== 'jumbled-letters' && currentType !== 'match-the-following' && currentType !== 'word-search' && (
+            {currentType === 'a-to-z' && (
+              <div className="w-full flex flex-col items-center justify-center relative z-10 my-4 md:my-8">
+                {(() => {
+                  const match = question.question.match(/letter\s+([A-Z])/i);
+                  const letter = match ? match[1].toUpperCase() : (question.question.trim().slice(-1).toUpperCase());
+                  
+                  return (
+                    <div className="flex flex-col items-center relative w-full max-w-5xl mx-auto">
+                      <motion.div 
+                        initial={{ scale: 0, rotateY: -180, opacity: 0 }}
+                        animate={{ scale: 1, rotateY: 0, opacity: 1 }}
+                        transition={{ type: 'spring', bounce: 0.6, duration: 1.5 }}
+                        whileHover={{ scale: 1.05, rotateZ: (Math.random() - 0.5) * 5 }}
+                        className="w-40 h-40 md:w-56 md:h-56 bg-gradient-to-br from-amber-300 via-amber-400 to-orange-500 rounded-[2.5rem] md:rounded-[3.5rem] shadow-[0_20px_50px_rgba(245,158,11,0.4)] border-[10px] md:border-[16px] border-white/80 flex items-center justify-center mb-8 relative z-20 overflow-hidden"
+                      >
+                         <motion.div 
+                           className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent skew-x-[-20deg]"
+                           animate={{ x: ['-200%', '200%'] }}
+                           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                         />
+                         <span className="text-[6rem] md:text-[10rem] font-black text-white drop-shadow-[0_10px_20px_rgba(0,0,0,0.3)] leading-none">{letter}</span>
+                      </motion.div>
+
+                      <AnimatePresence>
+                        {stage === 'reveal' && (
+                          <motion.div
+                            initial={{ scale: 0.8, y: -40, opacity: 0 }}
+                            animate={{ scale: 1, y: 0, opacity: 1 }}
+                            transition={{ type: 'spring', bounce: 0.5, delay: 0.3 }}
+                            className="w-full px-8 py-8 md:px-12 md:py-10 bg-white/95 backdrop-blur-xl border-b-[12px] border-emerald-500 rounded-[3rem] shadow-[0_20px_60px_rgba(0,0,0,0.2)] text-center relative z-10"
+                          >
+                             <h3 className="text-xl md:text-2xl text-emerald-600 font-black uppercase tracking-widest mb-4 flex items-center justify-center gap-3">
+                               <Award className="w-8 h-8" /> Correct Answer
+                             </h3>
+                             <p className="text-4xl md:text-6xl lg:text-7xl font-black text-slate-800 tracking-tight leading-tight mb-2">{question.correctAnswer}</p>
+                             {question.insight && (
+                               <div className="mt-8 px-6 py-5 md:px-8 md:py-6 bg-emerald-50 rounded-[2rem] border-4 border-emerald-100 flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-6 text-center md:text-left">
+                                 <div className="w-14 h-14 shrink-0 bg-emerald-100 rounded-full flex items-center justify-center shadow-inner">
+                                   <Lightbulb className="w-8 h-8 text-emerald-500" />
+                                 </div>
+                                 <p className="text-lg md:text-2xl text-slate-700 font-bold leading-relaxed">{question.insight}</p>
+                               </div>
+                             )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {!isJumbledLetters && currentType !== 'a-to-z' && currentType !== 'text-presentation' && currentType !== '5-clues' && currentType !== 'detective' && currentType !== 'jumbled-letters' && currentType !== 'match-the-following' && currentType !== 'word-search' && (
               <div className={`flex flex-col w-full ${quiz.mode === 'interactive' ? 'items-start text-left' : 'items-center'}`}>
                 <div className={`grid grid-cols-1 ${quiz.mode === 'interactive' ? 'lg:grid-cols-2' : 'md:grid-cols-2'} gap-6 w-full shrink-0 mb-6`}>
                   {( (question.type === 'True or False' || (question as any).category === 'True or False') && (!question.options || question.options.length === 0) ? ['True', 'False'] : question.options )?.map((option, i) => {
@@ -4156,18 +3862,6 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
 
                     return (
                       <motion.div
-                        initial={{ opacity: 0, y: 50, scale: 0.8 }}
-                        animate={isReveal && isCorrect ? { 
-                          scale: [1, 1.03, 1], 
-                          opacity: 1, 
-                          y: 0,
-                          boxShadow: ["0 10px 15px -3px rgba(0, 0, 0, 0.1)", "0 0 40px 10px rgba(16,185,129,0.6)", "0 10px 15px -3px rgba(0, 0, 0, 0.1)"]
-                        } : { opacity: 1, y: 0, scale: 1 }}
-                        transition={isReveal && isCorrect ? { 
-                          repeat: Infinity, 
-                          duration: 2,
-                          ease: "easeInOut" 
-                        } : { delay: i * 0.1, type: "spring", stiffness: 100 }}
                         key={i}
                         onClick={() => {
                           if (isEliminated) return;
@@ -4226,21 +3920,14 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                             }
                           }
                         }}
-                        
-                        className={`relative overflow-hidden px-6 py-4 rounded-3xl text-2xl md:text-3xl lg:text-4xl font-black flex items-center gap-4 transform transition-all ${cardClass}`}
+                        animate={isReveal && isCorrect ? { scale: [1, 1.05, 1] } : {}}
+                        transition={isReveal && isCorrect ? { repeat: Infinity, duration: 1.5 } : {}}
+                        className={`px-8 py-6 rounded-3xl text-3xl md:text-4xl lg:text-5xl font-black shadow-2xl flex items-center gap-8 transform transition-all ${cardClass}`}
                       >
-                        {isReveal && isCorrect && (
-                          <motion.div
-                            className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-12"
-                            initial={{ x: '-150%' }}
-                            animate={{ x: '150%' }}
-                            transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut', repeatDelay: 1 }}
-                          />
-                        )}
-                        <div className={`relative z-10 w-16 h-16 md:w-20 md:h-20 shrink-0 rounded-full flex items-center justify-center font-black text-3xl md:text-4xl shadow-inner ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                        <div className={`w-16 h-16 md:w-20 md:h-20 shrink-0 rounded-full flex items-center justify-center font-black text-3xl md:text-4xl shadow-inner ${isReveal && isCorrect ? 'bg-white text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
                           {optionLetters[i]}
                         </div>
-                        <span className="relative z-10 leading-tight">{option}</span>
+                        <span className="leading-tight">{option}</span>
                       </motion.div>
                     );
                   })}
@@ -4303,100 +3990,29 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             )}
             </>
             )}
-            
-            {stage !== 'reveal' && (
-              <div className="mt-auto pt-6 w-full max-w-6xl mx-auto z-20 shrink-0 pb-4">
-                <div className="relative flex items-center justify-center">
-                  {/* Graphical Time Left Icon/Badge */}
-                  <motion.div
-                    className={`absolute left-0 -ml-4 md:-ml-6 w-16 h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center border-[4px] shadow-[0_0_30px_rgba(0,0,0,0.3)] z-30 ${timeLeft <= 5 ? 'bg-red-500 border-red-200 text-white animate-pulse' : 'bg-white border-indigo-200 text-indigo-600'}`}
-                    animate={{ rotate: timeLeft <= 5 ? [0, -15, 15, -15, 15, 0] : [0, -5, 5, -5, 5, 0], scale: timeLeft <= 5 ? [1, 1.1, 1] : 1 }}
-                    transition={{ repeat: Infinity, duration: timeLeft <= 5 ? 0.5 : 2, ease: "easeInOut" }}
-                  >
-                    <Clock className={`w-8 h-8 md:w-10 md:h-10 ${timeLeft <= 5 ? 'text-white' : 'text-indigo-600'}`} />
-                  </motion.div>
-
-                  <div className="w-full h-10 md:h-14 bg-black/30 rounded-full overflow-hidden p-1.5 backdrop-blur-xl border-[4px] border-white/60 shadow-inner relative ml-8 md:ml-12 flex-1">
-                    <div className="absolute inset-0 flex items-center justify-center text-white font-black text-lg md:text-xl tracking-widest z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                      {timeLeft} SECONDS LEFT
-                    </div>
-                    <motion.div
-                      className={`h-full rounded-full shadow-[0_0_25px_rgba(255,255,255,0.8)] relative overflow-hidden ${timeLeft <= 5 ? 'bg-gradient-to-r from-red-500 via-rose-500 to-red-600' : 'bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600'}`}
-                      initial={{ width: '100%' }}
-                      animate={{ width: `${(timeLeft / (currentType === 'detective' || currentType === 'match-the-following' || currentType === 'word-search' ? (question.timeLimit || 30) : currentType === '5-clues' || currentType === 'find-in-map' || currentType === 'jumbled-letters' ? (question.timeLimit || 25) : quiz.type === 'rapid-fire' ? (question.timeLimit || quiz.timeLimit || 60) : (question.timeLimit || 15))) * 100}%` }}
-                      transition={{ duration: 1, ease: 'linear' }}
-                    >
-                      {/* Inner striped/shimmer effect */}
-                      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+CjxwYXRoIGQ9Ik0wLDQwIEw0MCwwIE0wLDIwIEwyMCwwIE0yMCw0MCBMNDAsMjAiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iNCIgb3BhY2l0eT0iMC4yIi8+Cjwvc3ZnPg==')] animate-slide-stripe" />
-                    </motion.div>
-                  </div>
-                </div>
-              </div>
-            )}
           </motion.div>
           </motion.div>
         )}
 
-        
         {stage === 'insight' && question.insight && (
           <motion.div
             key={`insight-${currentQuestionIndex}`}
-            className="relative flex flex-col items-center justify-center p-4 md:p-8 text-center z-10 w-full h-full overflow-hidden"
-            initial={{ opacity: 0, y: 50, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="relative flex flex-col items-center justify-center p-8 md:p-12 text-center z-10 w-full h-full"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.1 }}
-            transition={{ type: "spring", bounce: 0.5, duration: 0.8 }}
           >
-            {/* Background animated stars */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-              {[...Array(8)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute text-yellow-300 opacity-60 text-5xl md:text-7xl"
-                  initial={{ y: "120vh", x: (Math.random() - 0.5) * 1200 }}
-                  animate={{ y: "-20vh", rotate: 360 }}
-                  transition={{ duration: 3 + Math.random() * 3, repeat: Infinity, delay: Math.random() * 2, ease: "linear" }}
-                >
-                  ✨
-                </motion.div>
-              ))}
-            </div>
-
-            <div className="bg-gradient-to-br from-indigo-500 via-purple-500 to-fuchsia-500 rounded-[3rem] p-6 md:p-12 shadow-[0_30px_70px_rgba(168,85,247,0.5)] border-[8px] md:border-[12px] border-white/90 w-[95vw] md:w-[85vw] h-auto min-h-[60vh] max-h-[85vh] flex flex-col items-center justify-center relative z-10">
-              
-              <motion.div 
-                animate={{ y: [0, -10, 0], rotate: [0, 10, -10, 0] }} 
-                transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
-                className="absolute -top-10 md:-top-16 bg-yellow-400 border-[6px] border-white rounded-full p-4 md:p-6 shadow-2xl z-20"
-              >
-                <Lightbulb className="w-10 h-10 md:w-16 md:h-16 text-white" fill="currentColor" />
-              </motion.div>
-
-              <h2 className="text-4xl md:text-6xl lg:text-7xl font-black text-white mt-8 mb-6 uppercase tracking-wider drop-shadow-[0_4px_4px_rgba(0,0,0,0.3)]">
-                <span className="text-yellow-300">Did you</span> know?
-              </h2>
-
-              {question.insightImageUrl && quiz.enableInsightImages !== false && (
-                <motion.div
-                  initial={{ rotate: -5, scale: 0.5 }}
-                  animate={{ rotate: 3, scale: 1 }}
-                  transition={{ type: "spring", bounce: 0.6 }}
-                  className="bg-white p-3 md:p-4 pb-8 md:pb-12 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] mb-8 max-w-[90%] md:max-w-[70%] lg:max-w-[50%] mx-auto z-10"
-                >
-                  <img src={question.insightImageUrl} alt="Insight" className="w-auto h-auto max-h-[35vh] object-contain rounded-xl" crossOrigin="anonymous" referrerPolicy="no-referrer" />
-                </motion.div>
-              )}
-              
-              <div className="bg-white/20 backdrop-blur-sm border-2 border-white/30 rounded-3xl p-6 md:p-8 shadow-inner max-w-4xl mx-auto w-full">
-                <p className="text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-snug drop-shadow-md">
-                  {question.insight}
-                </p>
-              </div>
-
+            <div className="bg-emerald-900/40 backdrop-blur-md rounded-3xl p-10 md:p-16 shadow-[0_0_50px_rgba(52,211,153,0.3)] border-4 border-emerald-400 max-w-5xl w-full">
+              <Lightbulb className="w-24 h-24 text-yellow-300 mx-auto mb-8 animate-pulse drop-shadow-[0_0_15px_rgba(253,224,71,0.8)]" />
+              <h2 className="text-4xl md:text-5xl font-black text-yellow-300 leading-tight mb-8 uppercase tracking-widest drop-shadow-md">Did you know?</h2>
+              <p className="text-3xl md:text-5xl font-bold text-white leading-snug drop-shadow-lg">
+                {question.insight}
+              </p>
             </div>
           </motion.div>
         )}
-{stage === 'quote' && quiz.quotes?.[0] && (
+
+        {stage === 'quote' && quiz.quotes?.[0] && (
           <motion.div
             key={`quote`}
             initial={{ scale: 0.8, opacity: 0 }}
@@ -4474,14 +4090,14 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
           >
             {stage === 'memory-break-intro' && (
               <div className="text-center">
-                <div className="text-9xl mb-8 animate-bounce drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]">🧩</div>
+                <div className="text-9xl mb-8 animate-bounce drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]">🧠</div>
                 <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-lg mb-6 tracking-wider">Memory Break!</h1>
-                <p className="text-2xl md:text-4xl font-bold text-indigo-200">How many of these objects can you remember?</p>
+                <p className="text-2xl md:text-4xl font-bold text-indigo-200">Get ready to memorize the objects...</p>
               </div>
             )}
             
             {(stage === 'memory-break-memorize' || stage === 'memory-break-question' || stage === 'memory-break-reveal') && (
-              <div className="w-[80vw] h-[80vh] max-w-none flex flex-col items-center justify-center">
+              <div className="w-full max-w-6xl flex flex-col items-center">
                 {stage === 'memory-break-question' && (
                   <h2 className="text-4xl md:text-6xl font-black text-white drop-shadow-lg mb-8">
                     Where was the <span className="text-yellow-300 text-6xl md:text-8xl inline-block mx-2 drop-shadow-[0_0_15px_rgba(253,224,71,0.8)] animate-pulse">{memoryTarget}</span> ?
@@ -4489,7 +4105,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 )}
                 {stage === 'memory-break-memorize' && (
                   <h2 className="text-4xl md:text-5xl font-black text-white drop-shadow-lg mb-8 uppercase tracking-widest">
-                    Take a close look at these objects!
+                    Memorize these objects!
                   </h2>
                 )}
                 {stage === 'memory-break-reveal' && (
@@ -4498,15 +4114,15 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                   </h2>
                 )}
                 
-                <div className="flex flex-wrap justify-center items-center content-center gap-4 md:gap-6 w-full flex-1 min-h-0 py-4">
+                
+                <div className="grid gap-4 md:gap-8 justify-center items-center content-center w-full flex-1 min-h-0 py-4" style={{ gridTemplateColumns: `repeat(${Math.ceil(memoryItems.length / 2)}, minmax(0, auto))` }}>
                   {memoryItems.map((item, idx) => {
                     const count = memoryItems.length;
-                    const sizeClass = count <= 6 ? 'w-32 h-32 md:w-48 md:h-48 text-[5rem] md:text-[7rem]' : count <= 10 ? 'w-28 h-28 md:w-40 md:h-40 text-[4rem] md:text-[6rem]' : count <= 15 ? 'w-24 h-24 md:w-32 md:h-32 text-[3rem] md:text-[5rem]' : 'w-20 h-20 md:w-28 md:h-28 text-[2.5rem] md:text-[4rem]';
+                    const sizeClass = count <= 6 ? 'w-36 h-36 md:w-56 md:h-56 text-[6rem] md:text-[8rem]' : count <= 10 ? 'w-32 h-32 md:w-48 md:h-48 text-[5rem] md:text-[7rem]' : count <= 15 ? 'w-28 h-28 md:w-40 md:h-40 text-[4rem] md:text-[6rem]' : 'w-24 h-24 md:w-32 md:h-32 text-[3.5rem] md:text-[5rem]';
                     return (
                     <motion.div
                       key={idx}
-                      className={`bg-white/10 backdrop-blur-md border-4 border-white/20 rounded-3xl flex items-center justify-center shadow-xl relative cursor-pointer ${sizeClass}`}
-                      style={{ flexShrink: 0 }}
+                      className={`bg-white/10 backdrop-blur-md border-4 border-white/20 rounded-3xl flex items-center justify-center shadow-2xl relative cursor-pointer ${sizeClass}`}
                       animate={
                         stage === 'memory-break-reveal' && item === memoryTarget 
                         ? { scale: [1, 1.1, 1], borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.4)' } 
@@ -4597,7 +4213,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 🏆 FINAL SCOREBOARD 🏆
               </div>
 
-              <h1 style={{ fontFamily: "var(--font-display)" }} className="text-5xl md:text-7xl font-black text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)] tracking-tight">
+              <h1 className="text-4xl md:text-6xl font-black text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)] tracking-tight">
                 {(quiz.isMultiplayer || (playersState && playersState.length > 1)) ? 'Final Leaderboard Standings!' : 'Quiz Completed!'}
               </h1>
             </div>
@@ -4641,7 +4257,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                         </div>
 
                         <div className="text-left">
-                          <h2 className="text-2xl md:text-4xl font-black tracking-tight drop-shadow-sm">{player.name}</h2>
+                          <h2 className="text-2xl md:text-4xl font-extrabold drop-shadow-sm">{player.name}</h2>
                           {player.topic && (
                             <p className={`text-xs md:text-sm font-bold ${isWinner ? 'text-slate-900' : 'text-amber-200'}`}>
                               Specialty: {player.topic}
@@ -4699,7 +4315,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                       </motion.div>
 
                       <div className="flex flex-col items-center">
-                        <span className="text-2xl md:text-3xl font-black tracking-tight text-amber-300 uppercase tracking-wider mb-1">
+                        <span className="text-2xl md:text-3xl font-extrabold text-amber-300 uppercase tracking-wider mb-1">
                           Total Score
                         </span>
                         <div className="text-7xl md:text-9xl font-black text-white drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] leading-none">
@@ -4816,15 +4432,27 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                {quiz.mode === 'interactive' ? `${currentBadge.player}'s Milestone!` : 'Audience Milestone!'}
              </h1>
              <motion.div
-                initial={{ scale: 0, opacity: 0, y: 50 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                transition={{ type: 'spring', bounce: 0.5 }}
-                className={`bg-white rounded-3xl p-12 flex flex-col items-center text-center shadow-[0_40px_100px_rgba(0,0,0,0.5)] border-b-[16px] ${currentBadge.color} w-full max-w-md`}
+                initial={{ scale: 0.8, opacity: 0, y: 50, rotateX: -15 }}
+                animate={{ scale: 1, opacity: 1, y: 0, rotateX: 0 }}
+                transition={{ type: 'spring', bounce: 0.5, duration: 1 }}
+                className={`relative overflow-hidden bg-white/95 backdrop-blur-xl rounded-[3rem] p-12 flex flex-col items-center text-center shadow-[0_40px_100px_rgba(0,0,0,0.5)] border-4 ${currentBadge.color} w-full max-w-lg`}
               >
-                <div className="text-8xl md:text-9xl mb-8 filter drop-shadow-lg animate-bounce">{currentBadge.icon}</div>
-                <h3 className={`text-3xl md:text-5xl font-black ${currentBadge.text} mb-4`}>{currentBadge.title}</h3>
-                <p className="text-xl md:text-2xl text-slate-600 font-bold">{currentBadge.description}</p>
-                <div className="mt-6 py-2 px-6 bg-slate-100 rounded-full font-bold text-slate-500">
+                <motion.div 
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent skew-x-[-20deg]"
+                  animate={{ x: ['-200%', '200%'] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1 }}
+                />
+                <motion.div 
+                  animate={{ y: [0, -15, 0], rotate: [-3, 3, -3] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                  className="text-8xl md:text-[10rem] mb-10 filter drop-shadow-[0_20px_20px_rgba(0,0,0,0.2)] relative z-10"
+                >
+                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-amber-400/20 blur-3xl rounded-full mix-blend-multiply" />
+                   <span className="relative block">{currentBadge.icon}</span>
+                </motion.div>
+                <h3 className={`text-4xl md:text-5xl font-black ${currentBadge.text} mb-4 relative z-10 tracking-tight leading-tight`}>{currentBadge.title}</h3>
+                <p className="text-xl md:text-2xl text-slate-500 font-bold relative z-10 leading-snug">{currentBadge.description}</p>
+                <div className="mt-8 py-3 px-8 bg-slate-900 rounded-full font-bold text-amber-300 tracking-wider text-sm uppercase shadow-lg border border-slate-700 relative z-10">
                   {numAnswered} Questions Completed in {currentBadge.contextTopic}!
                 </div>
               </motion.div>
@@ -4837,62 +4465,45 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
             key="badges"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="relative flex flex-col items-center justify-center p-8 md:p-12 text-center z-10 w-full h-full overflow-hidden"
+            className="text-center p-12 max-w-7xl flex flex-col items-center justify-center h-full z-10 mx-auto w-full"
           >
-            {/* Background animated stars */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-              {[...Array(12)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute text-yellow-300 opacity-60 text-4xl md:text-6xl"
-                  initial={{ y: "120vh", x: (Math.random() - 0.5) * 1400 }}
-                  animate={{ y: "-20vh", rotate: 360 }}
-                  transition={{ duration: 4 + Math.random() * 4, repeat: Infinity, delay: Math.random() * 2, ease: "linear" }}
-                >
-                  ⭐
-                </motion.div>
-              ))}
-            </div>
-
-            <motion.h1 
-              initial={{ y: -50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ type: "spring", bounce: 0.6 }}
-              className="text-5xl md:text-7xl lg:text-8xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.4)] mb-12 uppercase tracking-wider relative z-10"
-            >
-              <span className="text-yellow-300">Earned</span> Badges!
-            </motion.h1>
-
-             <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10 w-full max-w-6xl relative z-10">
+             <h1 className="text-5xl md:text-7xl font-black text-white drop-shadow-2xl mb-12">
+               Earned Badges!
+             </h1>
+             
+             <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 w-full max-w-7xl relative z-10 px-4">
                {earnedBadges.map((badge, idx) => {
-                  const rotate = (idx % 2 === 0 ? 1 : -1) * (Math.random() * 4 + 2);
                   return (
                   <motion.div
                     key={idx}
-                    initial={{ scale: 0, opacity: 0, y: 100 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    whileHover={{ scale: 1.05, rotate: 0 }}
-                    transition={{ delay: idx * 0.4, type: 'spring', bounce: 0.6, duration: 0.8 }}
-                    className="relative group bg-gradient-to-br from-white to-slate-100 rounded-[2.5rem] p-6 md:p-8 flex flex-col items-center text-center shadow-[0_20px_50px_rgba(0,0,0,0.4)] border-[6px] md:border-[8px] border-white w-64 md:w-80"
-                    style={{ rotate: rotate }}
+                    initial={{ scale: 0.8, opacity: 0, y: 50, rotateX: 20 }}
+                    animate={{ scale: 1, opacity: 1, y: 0, rotateX: 0 }}
+                    whileHover={{ scale: 1.05, y: -10 }}
+                    transition={{ delay: idx * 0.2, type: 'spring', bounce: 0.5, duration: 1 }}
+                    className="relative group bg-white/95 backdrop-blur-xl rounded-[3rem] p-8 md:p-10 flex flex-col items-center text-center shadow-[0_20px_60px_rgba(0,0,0,0.2)] border-[6px] border-white/50 w-72 md:w-80 overflow-hidden"
                   >
-                    <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500 rounded-[2.8rem] opacity-0 group-hover:opacity-100 blur-md transition-opacity duration-500 -z-10" />
+                    {/* Animated Shine Effect */}
+                    <motion.div 
+                      className="absolute inset-0 -translate-x-[150%] skew-x-[-30deg] bg-gradient-to-r from-transparent via-white/70 to-transparent z-0 group-hover:translate-x-[150%]"
+                      transition={{ duration: 0.8, ease: "easeInOut" }}
+                    />
                     
                     <motion.div 
-                      animate={{ y: [0, -10, 0] }}
-                      transition={{ duration: 2 + Math.random(), repeat: Infinity, ease: "easeInOut" }}
-                      className="text-7xl md:text-9xl mb-4 md:mb-6 filter drop-shadow-[0_10px_10px_rgba(0,0,0,0.3)] z-10"
+                      animate={{ y: [0, -12, 0], rotate: [-2, 2, -2] }}
+                      transition={{ duration: 3 + Math.random(), repeat: Infinity, ease: "easeInOut" }}
+                      className="text-8xl md:text-9xl mb-8 filter drop-shadow-[0_15px_15px_rgba(0,0,0,0.2)] z-10 relative"
                     >
-                      {badge.icon}
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-amber-400/20 blur-3xl rounded-full mix-blend-multiply" />
+                      <span className="relative block transform transition-transform group-hover:scale-110 duration-500">{badge.icon}</span>
                     </motion.div>
 
-                    <div className="bg-indigo-100 text-indigo-700 font-bold uppercase tracking-widest text-xs px-4 py-1.5 rounded-full mb-3 border-2 border-indigo-200">
+                    <div className="z-10 bg-slate-900 text-amber-300 font-bold uppercase tracking-[0.15em] text-xs px-5 py-2 rounded-full mb-5 shadow-md border border-slate-700/50">
                       {badge.player}
                     </div>
 
-                    <h3 className="text-2xl md:text-3xl font-black text-slate-800 mb-3 leading-tight tracking-tight">{badge.name}</h3>
+                    <h3 className="z-10 text-3xl font-black text-slate-800 mb-4 tracking-tight leading-tight">{badge.name}</h3>
                     
-                    <p className="text-sm md:text-base text-slate-600 font-bold px-2 leading-snug">{badge.description}</p>
+                    <p className="z-10 text-sm md:text-base text-slate-500 font-semibold px-2 leading-relaxed">{badge.description}</p>
                   </motion.div>
                )})}
              </div>
@@ -4993,7 +4604,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                           >
                             <span>{r === 1 ? '👑 1st' : r === 2 ? '🥈 2nd' : r === 3 ? '🥉 3rd' : `${r}th`}</span>
                             <span className="truncate max-w-[100px]">{p.name}</span>
-                            <span className="bg-white/20 px-2 py-0.5 rounded-lg text-[11px] font-black tracking-tight">{p.score || 0} pts</span>
+                            <span className="bg-white/20 px-2 py-0.5 rounded-lg text-[11px] font-extrabold">{p.score || 0} pts</span>
                           </div>
                         );
                       })}
@@ -5174,7 +4785,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 <h1 className="text-4xl md:text-7xl font-black mb-3 text-white drop-shadow-2xl uppercase tracking-tight">
                   Thank you for participating!
                 </h1>
-                <p className="text-2xl md:text-3xl font-black tracking-tight text-cyan-200 drop-shadow-md mb-8">
+                <p className="text-2xl md:text-3xl font-extrabold text-cyan-200 drop-shadow-md mb-8">
                   Great job, {quiz.teamName || 'Player 1'}!
                 </p>
 
@@ -5300,7 +4911,7 @@ export default function Presentation({ quiz, onExit }: PresentationProps) {
                 <h1 className="text-5xl md:text-7xl font-black mb-3 text-white drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)] uppercase tracking-tight">
                   {outroMessage.title}
                 </h1>
-                <p className="text-2xl md:text-4xl font-black tracking-tight opacity-100 text-cyan-200 drop-shadow-md mb-8">
+                <p className="text-2xl md:text-4xl font-extrabold opacity-100 text-cyan-200 drop-shadow-md mb-8">
                   {outroMessage.subtitle}
                 </p>
 

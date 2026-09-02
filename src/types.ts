@@ -58,6 +58,7 @@ export interface QuizQuestion {
   timeLimit: number;
   imageUrl?: string;
   insightImageUrl?: string;
+  _imgOffset?: number;
   imagePreviewUrl?: string;
 }
 

@@ -159,6 +159,50 @@ async function startServer() {
 
   app.use(express.json({ limit: "50mb" }));
 
+  
+  app.post("/api/refresh-insight-image", async (req, res) => {
+    try {
+      const { query, offset = 1 } = req.body;
+      if (!query) return res.json({ image: null });
+      
+      let imageUrlsToTry = [];
+      try {
+        const ddgImages = await searchDuckDuckGoImages(query + " high quality -watermark");
+        imageUrlsToTry.push(...ddgImages);
+      } catch(e) {}
+      
+      let skipped = 0;
+      for (let i = 0; i < imageUrlsToTry.length; i++) {
+        const targetUrl = imageUrlsToTry[i];
+        if (!targetUrl) continue;
+        
+        try {
+          const fetchRes = await fetch(targetUrl, { 
+            headers: { "User-Agent": "Mozilla/5.0" },
+            signal: AbortSignal.timeout(3000)
+          });
+          if (fetchRes.ok) {
+            const arrayBuffer = await fetchRes.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            const base64 = buffer.toString('base64');
+            const mimeType = fetchRes.headers.get('content-type') || 'image/jpeg';
+            if (mimeType.startsWith('image/') || mimeType === 'application/octet-stream') {
+              if (skipped < offset) {
+                skipped++;
+                continue;
+              }
+              const finalImage = `data:${mimeType === 'application/octet-stream' ? 'image/jpeg' : mimeType};base64,${base64}`;
+              return res.json({ image: finalImage, nextOffset: offset + 1 });
+            }
+          }
+        } catch (err) {}
+      }
+      return res.json({ image: null, nextOffset: offset });
+    } catch(e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.post("/api/enrich-insights", async (req, res) => {
     try {
       const { questions, enableInsightImages } = req.body;
@@ -243,8 +287,8 @@ ${textContent}
                     question: { type: Type.STRING },
                     clues: { type: Type.ARRAY, items: { type: Type.STRING } },
                     insight: { type: Type.STRING },
-                    insightImageSearchQuery: { type: Type.STRING, description: "Extract 2-4 highly relevant keywords from the insight text and the main topic to find a highly accurate image. ONLY use visual nouns (e.g. 'Eiffel Tower Paris', 'Golden Retriever dog'). Do NOT use full sentences or verbs." },
-        blurTechnique: { type: Type.STRING, description: "For blurred-image quizzes. Choose a blur style: 'heavy-blur', 'pixelated-blur', 'grayscale-blur', or 'normal-blur'." },
+                    insightImageSearchQuery: { type: Type.STRING, description: "A highly specific image search query to find a photo representing the correct answer. This MUST be based purely on the correct answer itself (e.g. 'Eiffel Tower', 'Golden Retriever') and NEVER contain the full insight sentence or trivia question text." },
+        blurTechnique: { type: Type.STRING, description: "For blurred-image quizzes. Choose a blur style: 'heavy-blur', 'pixelated-blur', 'grayscale-blur', 'normal-blur', 'light-blur', 'invert-blur', 'sepia-blur', 'hue-rotate-blur', 'zoom-blur', 'high-contrast-blur'." },
                     timeLimit: { type: Type.NUMBER },
                   },
                   required: ["question", "clues", "insight", "timeLimit"]
@@ -540,7 +584,7 @@ Return a JSON array of objects, where each object has 'id' (matching the item) a
         timeLimit: { type: Type.NUMBER, description: "Time limit in seconds (usually 10, but use 20 for find-in-map rounds)." },
         imageSearchQuery: { type: Type.STRING, description: "If the quiz involves images, provide a highly specific Google Image Search query to fetch an accurate image. CRITICAL: Ensure the query fetches exactly the intended subject. Use highly specific terms (e.g., '2023 Ford Mustang car side view' not 'Mustang', 'Golden Retriever dog' not 'Dog'). Avoid generic terms that return unrelated images. CRITICAL RULE FOR MOVIES/TV SHOWS: You ABSOLUTELY MUST NOT search for the movie/show's poster. Instead, search for a lead actor portrait or a general object." },
         insight: { type: Type.STRING, description: "A fun 'Did you know?' fact related to the correct answer. Keep it very short (1 sentence)." },
-        insightImageSearchQuery: { type: Type.STRING, description: "Extract 2-4 highly relevant keywords from the insight text and the main topic to find a highly accurate image. ONLY use visual nouns (e.g. 'Eiffel Tower Paris', 'Golden Retriever dog'). Do NOT use full sentences or verbs." }
+        insightImageSearchQuery: { type: Type.STRING, description: "A highly specific image search query to find a photo representing the correct answer. This MUST be based purely on the correct answer itself (e.g. 'Eiffel Tower', 'Golden Retriever') and NEVER contain the full insight sentence or trivia question text." }
       };
       if (customItems && customItems.length > 0) { questionSchemaProps.id = { type: Type.STRING, description: "The exact ID of the item" }; }
       let requiredQuestionProps = ["question", "correctAnswer", "timeLimit"];
